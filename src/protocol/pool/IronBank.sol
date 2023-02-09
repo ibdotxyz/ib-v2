@@ -38,7 +38,7 @@ contract IronBank is
     }
 
     modifier onlyMarketConfigurator() {
-        require(msg.sender == marketConfigurator, "!configurator");
+        _checkMarketConfigurator();
         _;
     }
 
@@ -426,37 +426,19 @@ contract IronBank is
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function listMarket(
-        address market,
-        address ibTokenAddress,
-        address debtTokenAddress,
-        address interestRateModelAddress,
-        uint16 reserveFactor,
-        uint256 initialExchangeRate
-    ) external onlyOwner {
+    function listMarket(address market, MarketConfig calldata config) external onlyMarketConfigurator {
         Market storage m = markets[market];
         require(!m.config.isListed, "already listed");
-        require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
-        require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
-        require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
-        m.config.isListed = true;
-        m.config.ibTokenAddress = ibTokenAddress;
-        m.config.debtTokenAddress = debtTokenAddress;
-        m.config.interestRateModelAddress = interestRateModelAddress;
-        m.config.reserveFactor = reserveFactor;
-        m.config.initialExchangeRate = initialExchangeRate;
-
+        m.config = config;
         allMarkets.push(market);
 
         emit MarketListed(market);
     }
 
-    function delistMarket(address market) external onlyOwner {
+    function delistMarket(address market) external onlyMarketConfigurator {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(m.config.supplyPaused && m.config.borrowPaused, "not paused");
-        require(m.config.collateralFactor == 0, "collateral not zero");
 
         delete markets[market];
         allMarkets.deleteElement(market);
@@ -562,6 +544,10 @@ contract IronBank is
                 ),
             "!authorized"
         );
+    }
+
+    function _checkMarketConfigurator() internal view {
+        require(msg.sender == marketConfigurator, "!configurator");
     }
 
     function _getExchangeRate(Market storage m) internal view returns (uint256) {

@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import "./Constants.sol";
 import "./IronBankStorage.sol";
+import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 
 contract MarketConfigurator is Ownable2Step, Constants {
@@ -55,6 +56,30 @@ contract MarketConfigurator is Ownable2Step, Constants {
         emit GuardianSet(guardian);
     }
 
+    function listMarket(
+        address market,
+        address ibTokenAddress,
+        address debtTokenAddress,
+        address interestRateModelAddress,
+        uint16 reserveFactor,
+        uint256 initialExchangeRate
+    ) external onlyOwner {
+        IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
+        require(!config.isListed, "already listed");
+        require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
+        require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
+        require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
+
+        config.isListed = true;
+        config.ibTokenAddress = ibTokenAddress;
+        config.debtTokenAddress = debtTokenAddress;
+        config.interestRateModelAddress = interestRateModelAddress;
+        config.reserveFactor = reserveFactor;
+        config.initialExchangeRate = initialExchangeRate;
+
+        IronBankInterface(_pool).listMarket(market, config);
+    }
+
     function configureMarketAsCollateral(
         address market,
         uint16 collateralFactor,
@@ -86,7 +111,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     function adjustMarketCollateralFactor(address market, uint16 collateralFactor) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(collateralFactor > 0 && collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
+        require(collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
 
         config.collateralFactor = collateralFactor;
         IronBankInterface(_pool).setMarketConfiguration(market, config);
@@ -177,6 +202,16 @@ contract MarketConfigurator is Ownable2Step, Constants {
             emit MarketCollateralFactorSet(market, 0);
         }
         IronBankInterface(_pool).setMarketConfiguration(market, config);
+    }
+
+    function hardDelistMarket(address market) external onlyOwner {
+        IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
+        require(config.isListed, "not listed");
+        require(config.supplyPaused && config.borrowPaused, "not paused");
+        require(config.reserveFactor == MAX_RESERVE_FACTOR, "reserve factor not max");
+        require(config.collateralFactor == 0, "collateral factor not zero");
+
+        IronBankInterface(_pool).delistMarket(market);
     }
 
     struct MarketCap {

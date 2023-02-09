@@ -37,6 +37,10 @@ interface IronBankInterface {
 
     function getMarketConfiguration(address market) external view returns (IronBankStorage.MarketConfig memory);
 
+    function listMarket(address market, IronBankStorage.MarketConfig calldata config) external;
+
+    function delistMarket(address market) external;
+
     function setMarketConfiguration(address market, IronBankStorage.MarketConfig calldata config) external;
 
     /* ========== CREDIT LIMIT MANAGER INTERFACES ========== */
