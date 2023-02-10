@@ -2,6 +2,7 @@
 
 pragma solidity ^0.8.0;
 
+import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
 import "../pool/IronBank.sol";
@@ -136,15 +137,15 @@ contract IronBankLens is Constants {
         view
         returns (UserMarketInfo memory)
     {
-        (uint256 supplyBalance, uint256 collateralBalance) = ironBank.getSupplyBalance(user, market);
+        IERC20 ibToken = IERC20(ironBank.getIBTokenAddress(market));
         uint256 borrowBalance = ironBank.getBorrowBalance(user, market);
         bool isEnteredMarket = ironBank.isEnteredMarket(user, market);
 
         return UserMarketInfo({
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
-            supplyBalance: supplyBalance,
-            collateralBalance: collateralBalance,
+            supplyBalance: ibToken.balanceOf(user),
+            collateralBalance: ironBank.getUserCollateralBalance(user, market),
             borrowBalance: borrowBalance,
             isEnteredMarket: isEnteredMarket
         });
@@ -156,15 +157,15 @@ contract IronBankLens is Constants {
     {
         ironBank.accrueInterest(market);
 
-        (uint256 supplyBalance, uint256 collateralBalance) = ironBank.getSupplyBalance(user, market);
+        IERC20 ibToken = IERC20(ironBank.getIBTokenAddress(market));
         uint256 borrowBalance = ironBank.getBorrowBalance(user, market);
         bool isEnteredMarket = ironBank.isEnteredMarket(user, market);
 
         return UserMarketInfo({
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
-            supplyBalance: supplyBalance,
-            collateralBalance: collateralBalance,
+            supplyBalance: ibToken.balanceOf(user),
+            collateralBalance: ironBank.getUserCollateralBalance(user, market),
             borrowBalance: borrowBalance,
             isEnteredMarket: isEnteredMarket
         });

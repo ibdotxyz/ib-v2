@@ -4,8 +4,9 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
+import "./Common.t.sol";
 
-contract IRMTest is Test {
+contract IRMTest is Test, Common {
     uint256 internal constant baseRatePerSecond = 0.0001e18;
     uint256 internal constant borrowPerSecond1 = 0.002e18;
     uint256 internal constant kink1 = 0.8e18;
@@ -16,14 +17,7 @@ contract IRMTest is Test {
     TripleSlopeRateModel irm;
 
     function setUp() public {
-        irm = new TripleSlopeRateModel(
-            baseRatePerSecond,
-            borrowPerSecond1,
-            kink1,
-            borrowPerSecond2,
-            kink2,
-            borrowPerSecond3
-        );
+        irm = createIRM(baseRatePerSecond, borrowPerSecond1, kink1, borrowPerSecond2, kink2, borrowPerSecond3);
     }
 
     function testZeroUtilization() public {

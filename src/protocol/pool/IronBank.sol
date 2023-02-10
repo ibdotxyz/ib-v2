@@ -63,6 +63,10 @@ contract IronBank is
         return _getExchangeRate(m);
     }
 
+    function getCash(address market) public view returns (uint256) {
+        return markets[market].totalCash;
+    }
+
     function getMaxBorrowAmount(address market) public view returns (uint256) {
         Market storage m = markets[market];
         uint256 maxBorrowAmount = m.totalCash;
@@ -82,9 +86,8 @@ contract IronBank is
         return _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
     }
 
-    function getSupplyBalance(address user, address market) public view returns (uint256, uint256) {
-        Market storage m = markets[market];
-        return (m.userSupplies[user], m.userCollaterals[user]);
+    function getUserCollateralBalance(address user, address market) public view returns (uint256) {
+        return markets[market].userCollaterals[user];
     }
 
     function getAccountLiquidity(address user) public view returns (uint256, uint256) {
@@ -113,6 +116,14 @@ contract IronBank is
 
     function getMarketConfiguration(address market) public view returns (MarketConfig memory) {
         return markets[market].config;
+    }
+
+    function getIBTokenAddress(address market) public view returns (address) {
+        return markets[market].config.ibTokenAddress;
+    }
+
+    function getDebtTokenAddress(address market) public view returns (address) {
+        return markets[market].config.debtTokenAddress;
     }
 
     function calculateLiquidationOpportunity(address marketBorrow, address marketCollateral, uint256 repayAmount)
@@ -152,10 +163,10 @@ contract IronBank is
 
         if (m.userCollaterals[user] > 0) {
             _decreaseCollateral(market, m, user, m.userCollaterals[user]);
-        }
 
-        if (m.userSupplies[user] != 0 && m.config.collateralFactor != 0) {
-            _checkAccountLiquidity(user);
+            if (m.config.collateralFactor > 0) {
+                _checkAccountLiquidity(user);
+            }
         }
 
         emit MarketExited(market, user);
@@ -167,7 +178,7 @@ contract IronBank is
         require(!m.config.isFrozen, "frozen");
         require(isEnteredMarket(user, market), "market not entered");
 
-        uint256 gap = m.userSupplies[user] - m.userCollaterals[user];
+        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
         if (gap > 0) {
             _increaseCollateral(market, m, user, gap);
         }
@@ -198,13 +209,10 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
-        // Update internal cash in pool.
-        m.totalCash += amount;
-
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
 
-        // Update user supply status.
-        m.userSupplies[user] += ibTokenAmount;
+        // Update storage.
+        m.totalCash += amount;
         m.totalSupply += ibTokenAmount;
 
         if (isEnteredMarket(user, market)) {
@@ -260,7 +268,7 @@ contract IronBank is
 
         uint256 ibTokenAmount;
         if (amount == type(uint256).max) {
-            ibTokenAmount = m.userSupplies[user];
+            ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
@@ -268,11 +276,8 @@ contract IronBank is
 
         require(m.totalCash >= amount, "insufficient cash");
 
-        // Update internal cash in pool.
+        // Update storage.
         m.totalCash -= amount;
-
-        // Update user supply status.
-        m.userSupplies[user] -= ibTokenAmount;
         m.totalSupply -= ibTokenAmount;
 
         if (isEnteredMarket(user, market)) {
@@ -494,12 +499,17 @@ contract IronBank is
     }
 
     function seize(address token, address recipient) external onlyOwner {
-        require(!markets[token].config.isListed, "market is listed");
+        Market storage m = markets[token];
 
         uint256 balance = IERC20(token).balanceOf(address(this));
-        IERC20(token).safeTransfer(recipient, balance);
+        if (m.config.isListed) {
+            balance -= m.totalCash;
+        }
+        if (balance > 0) {
+            IERC20(token).safeTransfer(recipient, balance);
 
-        emit TokenSeized(token, recipient, balance);
+            emit TokenSeized(token, recipient, balance);
+        }
     }
 
     function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyOwner {
@@ -642,9 +652,6 @@ contract IronBank is
     }
 
     function _transferIBToken(Market storage m, address from, address to, uint256 amount) internal {
-        m.userSupplies[from] -= amount;
-        m.userSupplies[to] += amount;
-
         if (m.userCollaterals[from] > 0) {
             uint256 collateralAmount = _getCollateralToken(m, from, amount);
             m.userCollaterals[from] -= collateralAmount;
@@ -662,15 +669,21 @@ contract IronBank is
             uint256 interestIncreased = (interestFactor * m.totalBorrow) / 1e18;
             uint256 newTotalBorrow = m.totalBorrow + interestIncreased;
             uint256 feeIncreased = (interestIncreased * m.config.reserveFactor) / FACTOR_SCALE;
-            uint256 poolSize = m.totalCash + newTotalBorrow;
-            uint256 newTotalSupply = (m.totalSupply * poolSize) / (poolSize - feeIncreased);
-            uint256 reservesIncreased = newTotalSupply - m.totalSupply;
+            uint256 newTotalSupply = m.totalSupply;
+            uint256 newTotalReserves = m.totalReserves;
+            if (feeIncreased > 0) {
+                uint256 poolSize = m.totalCash + newTotalBorrow;
+                newTotalSupply = (m.totalSupply * poolSize) / (poolSize - feeIncreased);
+                newTotalReserves += newTotalSupply - m.totalSupply;
+            }
 
             m.totalBorrow = newTotalBorrow;
             m.borrowIndex += (interestFactor * m.borrowIndex) / 1e18;
             m.lastUpdateTimestamp = timestamp;
-            m.totalSupply = newTotalSupply;
-            m.totalReserves += reservesIncreased;
+            if (newTotalSupply != m.totalSupply) {
+                m.totalSupply = newTotalSupply;
+                m.totalReserves = newTotalReserves;
+            }
 
             emit InterestAccrued(market, interestIncreased, m.borrowIndex, m.totalBorrow);
         }
