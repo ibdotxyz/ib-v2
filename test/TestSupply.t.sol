@@ -10,7 +10,6 @@ import "../src/protocol/pool/IronBank.sol";
 import "../src/protocol/pool/IronBankStorage.sol";
 import "../src/protocol/pool/MarketConfigurator.sol";
 import "../src/protocol/token/IBToken.sol";
-import "../src/protocol/token/DebtToken.sol";
 import "./Common.t.sol";
 
 contract SupplyTest is Test, Common {

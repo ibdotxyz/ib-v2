@@ -77,12 +77,12 @@ abstract contract Common is Test {
     }
 
     function createDefaultIRM() internal returns (TripleSlopeRateModel) {
-        uint256 baseRatePerSecond = 0.0001e18;
-        uint256 borrowPerSecond1 = 0.0002e18;
+        uint256 baseRatePerSecond = 0.000000001e18;
+        uint256 borrowPerSecond1 = 0.000000001e18;
         uint256 kink1 = 0.8e18;
-        uint256 borrowPerSecond2 = 0.0003e18;
+        uint256 borrowPerSecond2 = 0.000000001e18;
         uint256 kink2 = 0.9e18;
-        uint256 borrowPerSecond3 = 0.0004e18;
+        uint256 borrowPerSecond3 = 0.000000001e18;
 
         return new TripleSlopeRateModel(
             baseRatePerSecond,
@@ -142,5 +142,32 @@ abstract contract Common is Test {
             address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor, _initialExchangeRate
         );
         return (market, ibToken, debtToken);
+    }
+
+    function setMarketCollateralFactor(
+        address _admin,
+        MarketConfigurator _configurator,
+        address _market,
+        uint16 _collateralFactor
+    ) internal {
+        vm.prank(_admin);
+        _configurator.adjustMarketCollateralFactor(_market, _collateralFactor);
+    }
+
+    function setPriceForMarket(
+        PriceOracle oracle,
+        FeedRegistry registry,
+        address admin,
+        address market,
+        address base,
+        address quote,
+        int256 price
+    ) internal {
+        vm.startPrank(admin);
+        registry.setAnswer(base, quote, price);
+        PriceOracle.Aggregator[] memory aggrs = new PriceOracle.Aggregator[](1);
+        aggrs[0] = PriceOracle.Aggregator({asset: market, base: base, quote: quote});
+        oracle._setAggregators(aggrs);
+        vm.stopPrank();
     }
 }

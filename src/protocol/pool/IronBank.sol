@@ -81,9 +81,8 @@ contract IronBank is
 
     function getBorrowBalance(address user, address market) public view returns (uint256) {
         Market storage m = markets[market];
-        UserBorrow memory b = m.userBorrows[user];
 
-        return _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
+        return _getBorrowBalance(m, user);
     }
 
     function getUserCollateralBalance(address user, address market) public view returns (uint256) {
@@ -240,22 +239,25 @@ contract IronBank is
         _accrueInterest(market, m);
         _enterMarket(market, user);
 
+        uint256 newUserBorrowBalance = _getBorrowBalance(m, user) + amount;
+
         // Update internal cash and total borrow in pool.
         m.totalCash -= amount;
         m.totalBorrow += amount;
 
         // Update user borrow status.
-        uint256 borrowBalance = _updateUserBorrowBalance(m, user, amount, 0);
+        m.userBorrows[user].borrowBalance = newUserBorrowBalance;
+        m.userBorrows[user].borrowIndex = m.borrowIndex;
 
         IERC20(market).safeTransfer(user, amount);
 
         if (isCreditAccount(user)) {
-            require(creditLimits[user][market] >= borrowBalance, "insufficient credit limit");
+            require(creditLimits[user][market] >= newUserBorrowBalance, "insufficient credit limit");
         } else {
             _checkAccountLiquidity(user);
         }
 
-        emit Borrow(market, user, amount, borrowBalance, m.totalBorrow);
+        emit Borrow(market, user, amount, newUserBorrowBalance, m.totalBorrow);
     }
 
     function redeem(address user, address market, uint256 amount) external nonReentrant isAuthorized(user) {
@@ -304,9 +306,11 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
+        uint256 newUserBorrowBalance;
         if (amount == type(uint256).max) {
-            UserBorrow memory b = m.userBorrows[user];
-            amount = _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
+            amount = _getBorrowBalance(m, user);
+        } else {
+            newUserBorrowBalance = _getBorrowBalance(m, user) - amount;
         }
 
         // Update internal cash and total borrow in pool.
@@ -314,11 +318,12 @@ contract IronBank is
         m.totalBorrow -= amount;
 
         // Update user borrow status.
-        uint256 borrowBalance = _updateUserBorrowBalance(m, user, 0, amount);
+        m.userBorrows[user].borrowBalance = newUserBorrowBalance;
+        m.userBorrows[user].borrowIndex = m.borrowIndex;
 
         IERC20(market).safeTransferFrom(msg.sender, address(this), amount);
 
-        emit Repay(market, user, amount, borrowBalance, m.totalBorrow);
+        emit Repay(market, user, amount, newUserBorrowBalance, m.totalBorrow);
     }
 
     function liquidate(
@@ -387,8 +392,7 @@ contract IronBank is
 
         _accrueInterest(market, m);
         if (amount == type(uint256).max) {
-            UserBorrow memory b = m.userBorrows[from];
-            amount = _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
+            amount = _getBorrowBalance(m, from);
         }
         _transferDebt(market, m, from, to, amount);
 
@@ -435,6 +439,8 @@ contract IronBank is
         Market storage m = markets[market];
         require(!m.config.isListed, "already listed");
 
+        m.lastUpdateTimestamp = _getNow();
+        m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
         allMarkets.push(market);
 
@@ -585,29 +591,15 @@ contract IronBank is
         return (repayAmount * numerator) / denominator;
     }
 
-    function _getBorrowBalance(uint256 borrowBalance, uint256 userBorrowIndex, uint256 marketBorrowindex)
-        internal
-        pure
-        returns (uint256)
-    {
-        if (borrowBalance == 0) {
+    function _getBorrowBalance(Market storage m, address user) internal view returns (uint256) {
+        UserBorrow memory b = m.userBorrows[user];
+
+        if (b.borrowBalance == 0) {
             return 0;
         }
 
-        // borrowBalanceWithInterests = borrowBalance * marketBorrowindex / userBorrowIndex
-        return (borrowBalance * marketBorrowindex) / userBorrowIndex;
-    }
-
-    function _updateUserBorrowBalance(Market storage m, address user, uint256 increaseAmount, uint256 decreaseAmount)
-        internal
-        returns (uint256)
-    {
-        require(increaseAmount == 0 || decreaseAmount == 0, "invalid argument");
-        UserBorrow storage b = m.userBorrows[user];
-        uint256 borrowBalance = _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
-        b.borrowBalance = borrowBalance + increaseAmount - decreaseAmount;
-        b.borrowIndex = m.borrowIndex;
-        return b.borrowBalance;
+        // borrowBalanceWithInterests = borrowBalance * marketBorrowIndex / userBorrowIndex
+        return (b.borrowBalance * m.borrowIndex) / b.borrowIndex;
     }
 
     function _increaseCollateral(address market, Market storage m, address user, uint256 amount) internal {
@@ -647,8 +639,10 @@ contract IronBank is
     function _transferDebt(address market, Market storage m, address from, address to, uint256 amount) internal {
         _enterMarket(market, to);
 
-        _updateUserBorrowBalance(m, from, 0, amount);
-        _updateUserBorrowBalance(m, to, amount, 0);
+        m.userBorrows[from].borrowBalance -= amount;
+        m.userBorrows[from].borrowIndex = m.borrowIndex;
+        m.userBorrows[to].borrowBalance += amount;
+        m.userBorrows[to].borrowIndex = m.borrowIndex;
     }
 
     function _transferIBToken(Market storage m, address from, address to, uint256 amount) internal {
@@ -690,6 +684,12 @@ contract IronBank is
     }
 
     function _enterMarket(address market, address user) internal {
+        Market storage m = markets[market];
+        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
+        if (gap > 0) {
+            _increaseCollateral(market, m, user, gap);
+        }
+
         if (enteredMarkets[user][market]) {
             // Skip if user has entered the market.
             return;
@@ -717,15 +717,14 @@ contract IronBank is
         uint256 debtValue;
 
         address[] memory userEnteredMarkets = allEnteredMarkets[user];
-        for (uint256 i = 0; i < userEnteredMarkets.length;) {
+        for (uint256 i = 0; i < userEnteredMarkets.length; i++) {
             Market storage m = markets[userEnteredMarkets[i]];
             if (!m.config.isListed) {
                 continue;
             }
-            UserBorrow storage b = m.userBorrows[user];
 
             uint256 collateralBalance = m.userCollaterals[user];
-            uint256 borrowBalance = _getBorrowBalance(b.borrowBalance, b.borrowIndex, m.borrowIndex);
+            uint256 borrowBalance = _getBorrowBalance(m, user);
             if (collateralBalance == 0 && borrowBalance == 0) {
                 // Skip if user has no supply or borrow balance on this asset.
                 continue;
@@ -740,10 +739,6 @@ contract IronBank is
             }
             if (borrowBalance > 0) {
                 debtValue += (borrowBalance * assetPrice) / 1e18;
-            }
-
-            unchecked {
-                i++;
             }
         }
         return (collateralValue, debtValue);

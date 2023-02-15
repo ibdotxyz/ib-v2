@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 abstract contract Constants {
+    uint256 internal constant INITIAL_BORROW_INDEX = 1e18;
     uint256 internal constant INITIAL_EXCHANGE_RATE = 1e18;
     uint256 internal constant FACTOR_SCALE = 10000;
 

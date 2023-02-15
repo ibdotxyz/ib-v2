@@ -34,7 +34,7 @@ contract FeedRegistry {
         if (getFeedFailed) {
             revert("Feed not found");
         }
-        return AggregatorV2V3Interface(address(0));
+        return AggregatorV2V3Interface(address(0)); // not important
     }
 
     function isFeedEnabled(address aggregator) external view returns (bool) {
