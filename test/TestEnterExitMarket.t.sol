@@ -17,7 +17,6 @@ contract EnterExitMarketTest is Test, Common {
     ERC20Market market1;
     ERC20Market market2;
     ERC20Market market3;
-    ERC20Market market4;
 
     address admin = address(64);
     address user1 = address(128);
@@ -41,9 +40,6 @@ contract EnterExitMarketTest is Test, Common {
             underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
         );
         (market3,,) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
-        (market4,,) = createAndListERC20Market(
             underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
         );
 
@@ -227,7 +223,6 @@ contract EnterExitMarketTest is Test, Common {
         vm.startPrank(admin);
         market2.approve(address(ib), market2BorrowAmount);
         ib.supply(admin, address(market2), market2BorrowAmount);
-        market1.transfer(user1, market1SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
