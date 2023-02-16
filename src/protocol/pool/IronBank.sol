@@ -143,6 +143,11 @@ contract IronBank is
         require(!m.config.isFrozen, "frozen");
 
         _enterMarket(market, user);
+
+        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
+        if (gap > 0) {
+            _increaseCollateral(market, m, user, gap);
+        }
     }
 
     function exitMarket(address user, address market) external nonReentrant isAuthorized(user) {
@@ -684,12 +689,6 @@ contract IronBank is
     }
 
     function _enterMarket(address market, address user) internal {
-        Market storage m = markets[market];
-        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
-        if (gap > 0) {
-            _increaseCollateral(market, m, user, gap);
-        }
-
         if (enteredMarkets[user][market]) {
             // Skip if user has entered the market.
             return;
