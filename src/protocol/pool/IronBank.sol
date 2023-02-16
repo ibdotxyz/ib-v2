@@ -176,18 +176,6 @@ contract IronBank is
         emit MarketExited(market, user);
     }
 
-    function registerCollateral(address user, address market) external nonReentrant isAuthorized(user) {
-        Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-        require(isEnteredMarket(user, market), "market not entered");
-
-        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
-        if (gap > 0) {
-            _increaseCollateral(market, m, user, gap);
-        }
-    }
-
     function accrueInterest(address market) external nonReentrant {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
