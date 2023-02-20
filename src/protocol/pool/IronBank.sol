@@ -63,8 +63,9 @@ contract IronBank is
         return _getExchangeRate(m);
     }
 
-    function getCash(address market) public view returns (uint256) {
-        return markets[market].totalCash;
+    function getMarketStatus(address market) public view returns (uint256, uint256, uint256, uint256, uint256) {
+        Market storage m = markets[market];
+        return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalCollateral, m.totalReserves);
     }
 
     function getMaxBorrowAmount(address market) public view returns (uint256) {

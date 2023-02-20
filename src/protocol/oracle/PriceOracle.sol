@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "chainlink/contracts/src/v0.8/Denominations.sol";
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/PriceOracleInterface.sol";
 
 contract PriceOracle is Ownable2Step, PriceOracleInterface {
@@ -31,7 +32,8 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
             uint256 ethUsdPrice = getPriceFromChainlink(Denominations.ETH, Denominations.USD);
             price = (price * ethUsdPrice) / 1e18;
         }
-        return price;
+        uint8 decimals = IERC20Metadata(asset).decimals();
+        return price * 10 ** (18 - decimals);
     }
 
     function getPriceFromChainlink(address base, address quote) internal view returns (uint256) {

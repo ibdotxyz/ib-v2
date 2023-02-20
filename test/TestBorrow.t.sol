@@ -17,7 +17,6 @@ import "./MockFeedRegistry.t.sol";
 
 contract BorrowTest is Test, Common {
     uint8 internal constant underlyingDecimals = 18; // 1e18
-    uint256 internal constant initialExchangeRate = 1e16; // 1 underlying -> 100 ibToken
     uint16 internal constant reserveFactor = 1000; // 10%
 
     int256 internal constant market1Price = 1500e8;
@@ -50,12 +49,10 @@ contract BorrowTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market1,, debtToken1) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
-        (market2,, debtToken2) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
+        (market1,, debtToken1) =
+            createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
+        (market2,, debtToken2) =
+            createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));

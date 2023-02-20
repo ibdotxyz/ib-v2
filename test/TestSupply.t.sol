@@ -14,7 +14,6 @@ import "./Common.t.sol";
 
 contract SupplyTest is Test, Common {
     uint8 internal constant underlyingDecimals = 18; // 1e18
-    uint256 internal constant initialExchangeRate = 1e16; // 1 underlying -> 100 ibToken
     uint16 internal constant reserveFactor = 1000; // 10%
 
     IronBank ib;
@@ -39,9 +38,7 @@ contract SupplyTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market, ibToken,) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
+        (market, ibToken,) = createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
 
         vm.startPrank(admin);
         market.transfer(user1, 10_000 * (10 ** underlyingDecimals));
@@ -57,14 +54,14 @@ contract SupplyTest is Test, Common {
 
         ib.supply(user1, address(market), supplyAmount);
 
-        assertEq(ibToken.balanceOf(user1), 10000e18);
-        assertEq(ibToken.totalSupply(), 10000e18);
+        assertEq(ibToken.balanceOf(user1), 100e18);
+        assertEq(ibToken.totalSupply(), 100e18);
 
         fastForwardTime(86400);
 
         // Accrue no interest without borrows.
         ib.accrueInterest(address(market));
-        assertEq(ibToken.balanceOf(user1), 10000e18);
+        assertEq(ibToken.balanceOf(user1), 100e18);
     }
 
     function testSupplyMultiple() public {
@@ -85,9 +82,9 @@ contract SupplyTest is Test, Common {
         vm.prank(user1);
         ib.supply(user1, address(market), supplyAmount);
 
-        assertEq(ibToken.balanceOf(user1), 20000e18);
-        assertEq(ibToken.balanceOf(user2), 10000e18);
-        assertEq(ibToken.totalSupply(), 30000e18);
+        assertEq(ibToken.balanceOf(user1), 200e18);
+        assertEq(ibToken.balanceOf(user2), 100e18);
+        assertEq(ibToken.totalSupply(), 300e18);
     }
 
     function testSupplyAndIncreaseCollateral() public {
@@ -100,8 +97,8 @@ contract SupplyTest is Test, Common {
 
         ib.supply(user1, address(market), supplyAmount);
 
-        assertEq(ibToken.balanceOf(user1), 10000e18);
-        assertEq(ib.getUserCollateralBalance(user1, address(market)), 10000e18);
+        assertEq(ibToken.balanceOf(user1), 100e18);
+        assertEq(ib.getUserCollateralBalance(user1, address(market)), 100e18);
     }
 
     function testCannotSupplyForInsufficientAllowance() public {

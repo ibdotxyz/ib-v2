@@ -130,17 +130,14 @@ abstract contract Common is Test {
         IronBank _ironBank,
         MarketConfigurator _configurator,
         TripleSlopeRateModel _irm,
-        uint16 _reserveFactor,
-        uint256 _initialExchangeRate
+        uint16 _reserveFactor
     ) internal returns (ERC20Market, IBToken, DebtToken) {
         ERC20Market market = new ERC20Market("Token", "TOKEN", _underlyingDecimals, _admin);
         IBToken ibToken = createIBToken(_admin, address(_ironBank), address(market));
         DebtToken debtToken = createDebtToken(_admin, address(_ironBank), address(market));
 
         vm.prank(_admin);
-        _configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor, _initialExchangeRate
-        );
+        _configurator.listMarket(address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor);
         return (market, ibToken, debtToken);
     }
 

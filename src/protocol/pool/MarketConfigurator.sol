@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
+import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./Constants.sol";
 import "./IronBankStorage.sol";
 import "../../interfaces/IBTokenInterface.sol";
@@ -61,8 +62,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
         address ibTokenAddress,
         address debtTokenAddress,
         address interestRateModelAddress,
-        uint16 reserveFactor,
-        uint256 initialExchangeRate
+        uint16 reserveFactor
     ) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
@@ -70,12 +70,15 @@ contract MarketConfigurator is Ownable2Step, Constants {
         require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
+        uint8 underlyingDecimals = IERC20Metadata(market).decimals();
+        require(underlyingDecimals <= 18, "nonstandard token decimals");
+
         config.isListed = true;
         config.ibTokenAddress = ibTokenAddress;
         config.debtTokenAddress = debtTokenAddress;
         config.interestRateModelAddress = interestRateModelAddress;
         config.reserveFactor = reserveFactor;
-        config.initialExchangeRate = initialExchangeRate;
+        config.initialExchangeRate = 10 ** underlyingDecimals;
 
         IronBankInterface(_pool).listMarket(market, config);
     }

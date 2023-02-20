@@ -7,7 +7,6 @@ import "./Common.t.sol";
 
 contract EnterExitMarketTest is Test, Common {
     uint8 internal constant underlyingDecimals = 18; // 1e18
-    uint256 internal constant initialExchangeRate = 1e16; // 1 underlying -> 100 ibToken
     uint16 internal constant reserveFactor = 1000; // 10%
 
     IronBank ib;
@@ -33,15 +32,9 @@ contract EnterExitMarketTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market1,,) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
-        (market2,,) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
-        (market3,,) = createAndListERC20Market(
-            underlyingDecimals, admin, ib, configurator, irm, reserveFactor, initialExchangeRate
-        );
+        (market1,,) = createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
+        (market2,,) = createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
+        (market3,,) = createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
 
         vm.startPrank(admin);
         market1.transfer(user1, 10_000 * (10 ** underlyingDecimals));
@@ -80,7 +73,7 @@ contract EnterExitMarketTest is Test, Common {
         assertEq(ib.getUserCollateralBalance(user1, address(market1)), 0);
 
         ib.enterMarket(user1, address(market1));
-        assertEq(ib.getUserCollateralBalance(user1, address(market1)), 10000e18);
+        assertEq(ib.getUserCollateralBalance(user1, address(market1)), 100e18);
         vm.stopPrank();
 
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
