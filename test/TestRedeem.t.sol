@@ -122,7 +122,7 @@ contract RedeemTest is Test, Common {
 
         assertEq(ibToken1.balanceOf(user1), 0);
         assertEq(ibToken1.totalSupply(), 0);
-        assertTrue(market1.balanceOf(user1) > 10000e18);
+        assertGt(market1.balanceOf(user1), 10000e18);
     }
 
     function testRedeemAndDecreaseCollateral() public {
@@ -241,7 +241,6 @@ contract RedeemTest is Test, Common {
          * collateral value = 100 * 0.8 * 1500 = 120,000
          * borrowed value = 100 * 1000 = 100,000
          */
-
         vm.prank(user1);
         vm.expectRevert("insufficient collateral");
         ib.redeem(user1, address(market1), redeemAmount);

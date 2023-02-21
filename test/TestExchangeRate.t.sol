@@ -189,7 +189,7 @@ contract ExchangeRateTest is Test, Common {
         vm.stopPrank();
 
         uint256 exchangeRate = ib.getExchangeRate(address(market1));
-        assertTrue(exchangeRate > 10 ** underlyingDecimals1);
+        assertGt(exchangeRate, 10 ** underlyingDecimals1);
 
         // Now market1 exchange rate is larger than 1. Test user1 supplies and redeems the same amount.
 
