@@ -624,10 +624,13 @@ contract IronBank is
     }
 
     function _getCollateralToken(Market storage m, address user, uint256 amount) internal view returns (uint256) {
-        if (amount <= m.userCollaterals[user]) {
-            return amount;
+        uint256 ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
+        uint256 gap = ibTokenAmount - m.userCollaterals[user];
+        if (amount > gap) {
+            return amount - gap;
+        } else {
+            return 0;
         }
-        return m.userCollaterals[user];
     }
 
     function _transferDebt(address market, Market storage m, address from, address to, uint256 amount) internal {
