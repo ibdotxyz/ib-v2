@@ -3,17 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
-import "chainlink/contracts/src/v0.8/Denominations.sol";
-import "openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
-import "../src/protocol/oracle/PriceOracle.sol";
-import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
-import "../src/protocol/pool/CreditLimitManager.sol";
-import "../src/protocol/pool/IronBank.sol";
-import "../src/protocol/pool/IronBankStorage.sol";
-import "../src/protocol/pool/MarketConfigurator.sol";
-import "../src/protocol/token/IBToken.sol";
 import "./Common.t.sol";
-import "./MockFeedRegistry.t.sol";
 
 contract ExchangeRateTest is Test, Common {
     uint8 internal constant underlyingDecimals1 = 18; // 1e18
@@ -199,7 +189,7 @@ contract ExchangeRateTest is Test, Common {
         vm.stopPrank();
 
         uint256 exchangeRate = ib.getExchangeRate(address(market1));
-        assertTrue(exchangeRate > 1e18);
+        assertTrue(exchangeRate > 10 ** underlyingDecimals1);
 
         // Now market1 exchange rate is larger than 1. Test user1 supplies and redeems the same amount.
 
