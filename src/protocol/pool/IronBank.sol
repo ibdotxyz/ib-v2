@@ -10,11 +10,11 @@ import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.s
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./IronBankStorage.sol";
 import "../../interfaces/DeferLiquidityCheckInterface.sol";
+import "../../interfaces/ExtensionRegistryInterface.sol";
 import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
-import "../../interfaces/UserHelperRegistryInterface.sol";
 import "../../libraries/Arrays.sol";
 
 contract IronBank is
@@ -68,16 +68,35 @@ contract IronBank is
         return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalCollateral, m.totalReserves);
     }
 
+    function isMarketListed(address market) public view returns (bool) {
+        Market storage m = markets[market];
+        return m.config.isListed;
+    }
+
     function getMaxBorrowAmount(address market) public view returns (uint256) {
         Market storage m = markets[market];
-        uint256 maxBorrowAmount = m.totalCash;
+        if (m.config.borrowCap == 0) {
+            return m.totalCash;
+        }
         if (m.config.borrowCap > m.totalBorrow) {
             uint256 gap = m.config.borrowCap - m.totalBorrow;
             if (gap < m.totalCash) {
-                maxBorrowAmount = gap;
+                return gap;
             }
+            return m.totalCash;
         }
-        return maxBorrowAmount;
+        return 0;
+    }
+
+    function getMaxCollateralizeAmount(address market) public view returns (uint256) {
+        Market storage m = markets[market];
+        if (m.config.collateralCap == 0) {
+            return type(uint256).max;
+        }
+        if (m.config.collateralCap > m.totalCollateral) {
+            return m.config.collateralCap - m.totalCollateral;
+        }
+        return 0;
     }
 
     function getBorrowBalance(address user, address market) public view returns (uint256) {
@@ -189,7 +208,7 @@ contract IronBank is
         _checkAccountLiquidity(user);
     }
 
-    function supply(address user, address market, uint256 amount) external nonReentrant isAuthorized(user) {
+    function supply(address user, address market, uint256 amount) external nonReentrant {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(!m.config.isFrozen, "frozen");
@@ -214,7 +233,7 @@ contract IronBank is
         }
 
         IBTokenInterface(m.config.ibTokenAddress).mint(user, ibTokenAmount);
-        IERC20(market).safeTransferFrom(user, address(this), amount);
+        IERC20(market).safeTransferFrom(msg.sender, address(this), amount);
 
         emit Supply(market, user, amount, ibTokenAmount);
     }
@@ -243,7 +262,7 @@ contract IronBank is
         m.userBorrows[user].borrowBalance = newUserBorrowBalance;
         m.userBorrows[user].borrowIndex = m.borrowIndex;
 
-        IERC20(market).safeTransfer(user, amount);
+        IERC20(market).safeTransfer(msg.sender, amount);
 
         if (isCreditAccount(user)) {
             require(creditLimits[user][market] >= newUserBorrowBalance, "insufficient credit limit");
@@ -283,7 +302,7 @@ contract IronBank is
         }
 
         IBTokenInterface(m.config.ibTokenAddress).burn(user, ibTokenAmount);
-        IERC20(market).safeTransfer(user, amount);
+        IERC20(market).safeTransfer(msg.sender, amount);
 
         _checkAccountLiquidity(user);
 
@@ -550,7 +569,7 @@ contract IronBank is
             msg.sender == user
                 || (
                     !isCreditAccount(user) && userHelperRegistry != address(0)
-                        && UserHelperRegistryInterface(userHelperRegistry).isHelperAuthorized(user, msg.sender)
+                        && ExtensionRegistryInterface(userHelperRegistry).isAuthorized(user, msg.sender)
                 ),
             "!authorized"
         );

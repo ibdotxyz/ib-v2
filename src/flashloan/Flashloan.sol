@@ -22,8 +22,7 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
     }
 
     function maxFlashLoan(address token) external view override returns (uint256) {
-        IronBankStorage.MarketConfig memory config = IronBankInterface(_pool).getMarketConfiguration(token);
-        if (!config.isListed) {
+        if (!IronBankInterface(_pool).isMarketListed(token)) {
             return 0;
         }
 
@@ -33,8 +32,7 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
     function flashFee(address token, uint256 amount) external view override returns (uint256) {
         amount;
 
-        IronBankStorage.MarketConfig memory config = IronBankInterface(_pool).getMarketConfiguration(token);
-        require(config.isListed, "token not listed");
+        require(IronBankInterface(_pool).isMarketListed(token), "token not listed");
 
         return 0;
     }
@@ -44,8 +42,7 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
         override
         returns (bool)
     {
-        IronBankStorage.MarketConfig memory config = IronBankInterface(_pool).getMarketConfiguration(token);
-        require(config.isListed, "token not listed");
+        require(IronBankInterface(_pool).isMarketListed(token), "token not listed");
 
         if (!_isDeferredLiquidityCheck) {
             IronBankInterface(_pool).deferLiquidityCheck(
