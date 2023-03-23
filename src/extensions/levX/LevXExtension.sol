@@ -5,8 +5,8 @@ pragma solidity ^0.8.0;
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import "uniswap-v2-core/contracts/interfaces/IUniswapV2Factory.sol";
-import "uniswap-v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import "v2-core/interfaces/IUniswapV2Factory.sol";
+import "v2-core/interfaces/IUniswapV2Pair.sol";
 import "../../interfaces/IronBankInterface.sol";
 
 contract LevXExtension is Ownable2Step {
@@ -73,6 +73,9 @@ contract LevXExtension is Ownable2Step {
     ) public {
         require(longAsset != shortAsset, "invalid long or short asset");
         require(isAssetSupport(longAsset) && isAssetSupport(shortAsset), "long or short asset not support");
+        require(longAmount > 0, "invalid long amount");
+
+        // Add collateral for user if provided.
         if (collateralData.length > 0) {
             addCollateral(collateralData);
         }
@@ -100,6 +103,12 @@ contract LevXExtension is Ownable2Step {
         require(longAsset != shortAsset, "invalid long or short asset");
         require(isAssetSupport(longAsset) && isAssetSupport(shortAsset), "long or short asset not support");
 
+        if (longAmount == type(uint256).max) {
+            pool.accrueInterest(longAsset);
+            longAmount = pool.getBorrowBalance(msg.sender, longAsset);
+        }
+        require(longAmount > 0, "invalid long amount");
+
         address tokenB = longAsset == weth ? shortAsset : weth;
         (uint256 amount0, uint256 amount1) = longAsset < tokenB ? (longAmount, uint256(0)) : (uint256(0), longAmount);
         address pairFrom = factory.getPair(longAsset, tokenB);
@@ -111,7 +120,7 @@ contract LevXExtension is Ownable2Step {
                 shortAsset: shortAsset,
                 maxShortAmount: maxShortAmount,
                 pairFrom: pairFrom,
-                isOpenPosition: true
+                isOpenPosition: false
             })
         );
 
