@@ -36,16 +36,17 @@ contract LevXExtension is Ownable2Step {
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function addCollateral(address[] memory collateralAssets, uint256[] memory collateralAmounts) public {
-        require(collateralAssets.length == collateralAmounts.length, "mismatch data");
+    struct CollateralData {
+        address asset;
+        uint256 amount;
+    }
 
-        for (uint256 i = 0; i < collateralAssets.length;) {
-            require(isAssetSupport(collateralAssets[i]), "collateral asset not support");
-
-            IERC20(collateralAssets[i]).safeTransferFrom(msg.sender, address(this), collateralAmounts[i]);
-            IERC20(collateralAssets[i]).safeIncreaseAllowance(address(pool), collateralAmounts[i]);
-            pool.supply(msg.sender, collateralAssets[i], collateralAmounts[i]);
-            pool.enterMarket(msg.sender, collateralAssets[i]);
+    function addCollateral(CollateralData[] memory collateralData) public {
+        for (uint256 i = 0; i < collateralData.length;) {
+            IERC20(collateralData[i].asset).safeTransferFrom(msg.sender, address(this), collateralData[i].amount);
+            IERC20(collateralData[i].asset).safeIncreaseAllowance(address(pool), collateralData[i].amount);
+            pool.supply(msg.sender, collateralData[i].asset, collateralData[i].amount);
+            pool.enterMarket(msg.sender, collateralData[i].asset);
 
             unchecked {
                 i++;
@@ -58,7 +59,7 @@ contract LevXExtension is Ownable2Step {
         address longAsset;
         uint256 longAmount;
         address shortAsset;
-        uint256 shortAmount;
+        uint256 maxShortAmount;
         address pairFrom;
         bool isOpenPosition;
     }
@@ -67,18 +68,17 @@ contract LevXExtension is Ownable2Step {
         address longAsset,
         uint256 longAmount,
         address shortAsset,
-        uint256 shortAmount,
-        address[] memory collateralAssets,
-        uint256[] memory collateralAmounts
+        uint256 maxShortAmount,
+        CollateralData[] memory collateralData
     ) public {
         require(longAsset != shortAsset, "invalid long or short asset");
         require(isAssetSupport(longAsset) && isAssetSupport(shortAsset), "long or short asset not support");
-        if (collateralAssets.length > 0) {
-            addCollateral(collateralAssets, collateralAmounts);
+        if (collateralData.length > 0) {
+            addCollateral(collateralData);
         }
 
-        (uint256 amount0, uint256 amount1) = longAsset <= weth ? (longAmount, uint256(0)) : (uint256(0), longAmount);
         address tokenB = longAsset == weth ? shortAsset : weth;
+        (uint256 amount0, uint256 amount1) = longAsset < tokenB ? (longAmount, uint256(0)) : (uint256(0), longAmount);
         address pairFrom = factory.getPair(longAsset, tokenB);
         bytes memory data = abi.encode(
             SwapData({
@@ -86,7 +86,7 @@ contract LevXExtension is Ownable2Step {
                 longAsset: longAsset,
                 longAmount: longAmount,
                 shortAsset: shortAsset,
-                shortAmount: shortAmount,
+                maxShortAmount: maxShortAmount,
                 pairFrom: pairFrom,
                 isOpenPosition: true
             })
@@ -96,12 +96,12 @@ contract LevXExtension is Ownable2Step {
         IUniswapV2Pair(pairFrom).swap(amount0, amount1, address(this), data);
     }
 
-    function close(address longAsset, uint256 longAmount, address shortAsset, uint256 shortAmount) public {
+    function close(address longAsset, uint256 longAmount, address shortAsset, uint256 maxShortAmount) public {
         require(longAsset != shortAsset, "invalid long or short asset");
         require(isAssetSupport(longAsset) && isAssetSupport(shortAsset), "long or short asset not support");
 
-        (uint256 amount0, uint256 amount1) = longAsset <= weth ? (longAmount, uint256(0)) : (uint256(0), longAmount);
         address tokenB = longAsset == weth ? shortAsset : weth;
+        (uint256 amount0, uint256 amount1) = longAsset < tokenB ? (longAmount, uint256(0)) : (uint256(0), longAmount);
         address pairFrom = factory.getPair(longAsset, tokenB);
         bytes memory data = abi.encode(
             SwapData({
@@ -109,7 +109,7 @@ contract LevXExtension is Ownable2Step {
                 longAsset: longAsset,
                 longAmount: longAmount,
                 shortAsset: shortAsset,
-                shortAmount: shortAmount,
+                maxShortAmount: maxShortAmount,
                 pairFrom: pairFrom,
                 isOpenPosition: true
             })
@@ -125,12 +125,13 @@ contract LevXExtension is Ownable2Step {
         require(msg.sender == address(decoded.pairFrom), "not pair");
         require(sender == address(this), "not sender");
 
-        uint256 longAmount = decoded.longAsset <= weth ? amount0 : amount1;
+        uint256 longAmount = amount0 > 0 ? amount0 : amount1;
         require(longAmount == decoded.longAmount, "incorrect amount");
 
         IERC20(decoded.longAsset).safeIncreaseAllowance(address(pool), longAmount);
         if (decoded.isOpenPosition) {
             // Supply the long asset for user.
+            pool.enterMarket(decoded.caller, decoded.longAsset);
             pool.supply(decoded.caller, decoded.longAsset, longAmount);
         } else {
             // Repay the long asset for user.
@@ -143,7 +144,7 @@ contract LevXExtension is Ownable2Step {
 
         if (decoded.longAsset == weth || decoded.shortAsset == weth) {
             // A <-> weth or weth <-> A
-            require(minRepay <= decoded.shortAmount, "incorrect amount");
+            require(minRepay <= decoded.maxShortAmount, "incorrect amount");
 
             if (decoded.isOpenPosition) {
                 // Borrow the short asset for user.
@@ -201,7 +202,7 @@ contract LevXExtension is Ownable2Step {
         (uint256 reserveIn, uint256 reserveOut) =
             tokenA == decoded.shortAsset ? (reserve0, reserve1) : (reserve1, reserve0);
         uint256 minRepay = getAmountIn(minWethRepay, reserveIn, reserveOut);
-        require(minRepay <= decoded.shortAmount, "incorrect amount");
+        require(minRepay <= decoded.maxShortAmount, "incorrect amount");
 
         if (decoded.isOpenPosition) {
             // Borrow the short asset for user.

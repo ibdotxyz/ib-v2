@@ -15,7 +15,7 @@ contract IronBankStorage is Constants {
 
     event CreditLimitManagerSet(address manager);
 
-    event UserHelperRegistrySet(address registry);
+    event ExtensionrRegistrySet(address registry);
 
     event CreditLimitChanged(address user, address market, uint256 credit);
 
@@ -103,5 +103,5 @@ contract IronBankStorage is Constants {
 
     address public marketConfigurator;
     address public creditLimitManager;
-    address public userHelperRegistry;
+    address public extensionRegistry;
 }

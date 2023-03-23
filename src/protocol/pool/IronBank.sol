@@ -511,10 +511,10 @@ contract IronBank is
         emit CreditLimitManagerSet(manager);
     }
 
-    function setUserHelperRegistry(address registry) external onlyOwner {
-        userHelperRegistry = registry;
+    function setExtensionRegistry(address registry) external onlyOwner {
+        extensionRegistry = registry;
 
-        emit UserHelperRegistrySet(registry);
+        emit ExtensionrRegistrySet(registry);
     }
 
     function seize(address token, address recipient) external onlyOwner {
@@ -568,8 +568,8 @@ contract IronBank is
         require(
             msg.sender == user
                 || (
-                    !isCreditAccount(user) && userHelperRegistry != address(0)
-                        && ExtensionRegistryInterface(userHelperRegistry).isAuthorized(user, msg.sender)
+                    !isCreditAccount(user) && extensionRegistry != address(0)
+                        && ExtensionRegistryInterface(extensionRegistry).isAuthorized(user, msg.sender)
                 ),
             "!authorized"
         );
