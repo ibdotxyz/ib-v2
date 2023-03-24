@@ -40,6 +40,10 @@ contract LevXExtensionTest is Test, Common {
     address user1 = address(128);
 
     function setUp() public {
+        string memory url = vm.rpcUrl("mainnet");
+        uint256 forkId = vm.createFork(url);
+        vm.selectFork(forkId);
+
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
