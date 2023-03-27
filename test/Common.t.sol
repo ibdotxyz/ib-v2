@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/extensions/levX/LevXExtension.sol";
+import "../src/extensions/weth/WethExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
@@ -218,5 +219,19 @@ abstract contract Common is Test {
         _registry.addGlobalExtensions(extensions);
         vm.stopPrank();
         return levX;
+    }
+
+    function createWethExtension(address _admin, IronBank _ironBank, ExtensionRegistry _registry, address _weth)
+        internal
+        returns (WethExtension)
+    {
+        WethExtension wethExtension = new WethExtension(address(_ironBank), _weth);
+
+        vm.startPrank(_admin);
+        address[] memory extensions = new address[](1);
+        extensions[0] = address(wethExtension);
+        _registry.addGlobalExtensions(extensions);
+        vm.stopPrank();
+        return wethExtension;
     }
 }

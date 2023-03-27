@@ -32,10 +32,6 @@ contract LevXExtensionTest is Test, Common {
     PriceOracle oracle;
     LevXExtension levX;
 
-    IBToken iWETH;
-    IBToken iDAI;
-    IBToken iUSDT;
-
     address admin = address(64);
     address user1 = address(128);
 
@@ -57,9 +53,9 @@ contract LevXExtensionTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (iWETH,) = createAndListERC20Market(WETH, admin, ib, configurator, irm, reserveFactor);
-        (iDAI,) = createAndListERC20Market(DAI, admin, ib, configurator, irm, reserveFactor);
-        (iUSDT,) = createAndListERC20Market(USDT, admin, ib, configurator, irm, reserveFactor);
+        createAndListERC20Market(WETH, admin, ib, configurator, irm, reserveFactor);
+        createAndListERC20Market(DAI, admin, ib, configurator, irm, reserveFactor);
+        createAndListERC20Market(USDT, admin, ib, configurator, irm, reserveFactor);
 
         oracle = createPriceOracle(admin, feedRegistry);
         ib.setPriceOracle(address(oracle));
