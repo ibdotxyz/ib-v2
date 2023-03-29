@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/extensions/levX/LevXExtension.sol";
+import "../src/extensions/levX/LevXUniV3Extension.sol";
 import "../src/extensions/weth/WethExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
@@ -211,6 +212,24 @@ abstract contract Common is Test {
         address _weth
     ) internal returns (LevXExtension) {
         LevXExtension levX = new LevXExtension(address(_ironBank), _factory, _weth);
+        levX.transferOwnership(_admin);
+        vm.startPrank(_admin);
+        levX.acceptOwnership();
+        address[] memory extensions = new address[](1);
+        extensions[0] = address(levX);
+        _registry.addGlobalExtensions(extensions);
+        vm.stopPrank();
+        return levX;
+    }
+
+    function createLevXUniV3Extension(
+        address _admin,
+        IronBank _ironBank,
+        ExtensionRegistry _registry,
+        address _factory,
+        address _weth
+    ) internal returns (LevXUniV3Extension) {
+        LevXUniV3Extension levX = new LevXUniV3Extension(address(_ironBank), _factory, _weth);
         levX.transferOwnership(_admin);
         vm.startPrank(_admin);
         levX.acceptOwnership();
