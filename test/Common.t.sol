@@ -4,9 +4,13 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "../src/extensions/levX/LevXExtension.sol";
+import "../src/extensions/levX/LevXUniV3Extension.sol";
+import "../src/extensions/weth/WethExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
+import "../src/protocol/pool/ExtensionRegistry.sol";
 import "../src/protocol/pool/IronBank.sol";
 import "../src/protocol/pool/IronBankProxy.sol";
 import "../src/protocol/pool/MarketConfigurator.sol";
@@ -56,6 +60,14 @@ abstract contract Common is Test {
         vm.prank(_admin);
         creditLimitManager.acceptOwnership();
         return creditLimitManager;
+    }
+
+    function createExtensionRegistry(address _admin, IronBank _ironBank) internal returns (ExtensionRegistry) {
+        ExtensionRegistry extensionRegistry = new ExtensionRegistry(address(_ironBank));
+        extensionRegistry.transferOwnership(_admin);
+        vm.prank(_admin);
+        extensionRegistry.acceptOwnership();
+        return extensionRegistry;
     }
 
     function createIBToken(address _admin, address _pool, address _underlying) internal returns (IBToken) {
@@ -139,6 +151,22 @@ abstract contract Common is Test {
         return (market, ibToken, debtToken);
     }
 
+    function createAndListERC20Market(
+        address _market,
+        address _admin,
+        IronBank _ironBank,
+        MarketConfigurator _configurator,
+        TripleSlopeRateModel _irm,
+        uint16 _reserveFactor
+    ) internal returns (IBToken, DebtToken) {
+        IBToken ibToken = createIBToken(_admin, address(_ironBank), _market);
+        DebtToken debtToken = createDebtToken(_admin, address(_ironBank), _market);
+
+        vm.prank(_admin);
+        _configurator.listMarket(_market, address(ibToken), address(debtToken), address(_irm), _reserveFactor);
+        return (ibToken, debtToken);
+    }
+
     function setMarketCollateralFactor(
         address _admin,
         MarketConfigurator _configurator,
@@ -164,5 +192,65 @@ abstract contract Common is Test {
         aggrs[0] = PriceOracle.Aggregator({asset: market, base: base, quote: quote});
         oracle._setAggregators(aggrs);
         vm.stopPrank();
+    }
+
+    function setPriceForMarket(PriceOracle oracle, address admin, address market, address base, address quote)
+        internal
+    {
+        vm.startPrank(admin);
+        PriceOracle.Aggregator[] memory aggrs = new PriceOracle.Aggregator[](1);
+        aggrs[0] = PriceOracle.Aggregator({asset: market, base: base, quote: quote});
+        oracle._setAggregators(aggrs);
+        vm.stopPrank();
+    }
+
+    function createLevXExtension(
+        address _admin,
+        IronBank _ironBank,
+        ExtensionRegistry _registry,
+        address _factory,
+        address _weth
+    ) internal returns (LevXExtension) {
+        LevXExtension levX = new LevXExtension(address(_ironBank), _factory, _weth);
+        levX.transferOwnership(_admin);
+        vm.startPrank(_admin);
+        levX.acceptOwnership();
+        address[] memory extensions = new address[](1);
+        extensions[0] = address(levX);
+        _registry.addGlobalExtensions(extensions);
+        vm.stopPrank();
+        return levX;
+    }
+
+    function createLevXUniV3Extension(
+        address _admin,
+        IronBank _ironBank,
+        ExtensionRegistry _registry,
+        address _factory,
+        address _weth
+    ) internal returns (LevXUniV3Extension) {
+        LevXUniV3Extension levX = new LevXUniV3Extension(address(_ironBank), _factory, _weth);
+        levX.transferOwnership(_admin);
+        vm.startPrank(_admin);
+        levX.acceptOwnership();
+        address[] memory extensions = new address[](1);
+        extensions[0] = address(levX);
+        _registry.addGlobalExtensions(extensions);
+        vm.stopPrank();
+        return levX;
+    }
+
+    function createWethExtension(address _admin, IronBank _ironBank, ExtensionRegistry _registry, address _weth)
+        internal
+        returns (WethExtension)
+    {
+        WethExtension wethExtension = new WethExtension(address(_ironBank), _weth);
+
+        vm.startPrank(_admin);
+        address[] memory extensions = new address[](1);
+        extensions[0] = address(wethExtension);
+        _registry.addGlobalExtensions(extensions);
+        vm.stopPrank();
+        return wethExtension;
     }
 }

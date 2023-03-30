@@ -62,22 +62,22 @@ contract SupplyTest is Test, Common {
 
         vm.startPrank(user1);
         market.approve(address(ib), type(uint256).max);
-
         ib.supply(user1, address(market), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user2);
         market.approve(address(ib), type(uint256).max);
-
         ib.supply(user2, address(market), supplyAmount);
         vm.stopPrank();
 
-        vm.prank(user1);
+        vm.startPrank(user1);
         ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user2, address(market), supplyAmount); // supply for user2
+        vm.stopPrank();
 
         assertEq(ibToken.balanceOf(user1), 200e18);
-        assertEq(ibToken.balanceOf(user2), 100e18);
-        assertEq(ibToken.totalSupply(), 300e18);
+        assertEq(ibToken.balanceOf(user2), 200e18);
+        assertEq(ibToken.totalSupply(), 400e18);
     }
 
     function testSupplyAndIncreaseCollateral() public {
@@ -110,16 +110,6 @@ contract SupplyTest is Test, Common {
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         ib.supply(user1, address(market), supplyAmount);
-    }
-
-    function testCannotSupplyForUnauthorized() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
-
-        vm.startPrank(user1);
-        market.approve(address(ib), supplyAmount);
-
-        vm.expectRevert("!authorized");
-        ib.supply(user2, address(market), supplyAmount);
     }
 
     function testCannotSupplyForMarketNotListed() public {
