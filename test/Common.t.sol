@@ -4,9 +4,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/extensions/levX/LevXExtension.sol";
-import "../src/extensions/levX/LevXUniV3Extension.sol";
-import "../src/extensions/weth/WethExtension.sol";
+import "../src/extensions/IronBankExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
@@ -204,53 +202,22 @@ abstract contract Common is Test {
         vm.stopPrank();
     }
 
-    function createLevXExtension(
+    function createExtension(
         address _admin,
         IronBank _ironBank,
         ExtensionRegistry _registry,
-        address _factory,
+        address _uniV3Factory,
+        address _uniV2Factory,
         address _weth
-    ) internal returns (LevXExtension) {
-        LevXExtension levX = new LevXExtension(address(_ironBank), _factory, _weth);
-        levX.transferOwnership(_admin);
+    ) internal returns (IronBankExtension) {
+        IronBankExtension ext = new IronBankExtension(address(_ironBank), _uniV3Factory, _uniV2Factory, _weth);
+        ext.transferOwnership(_admin);
         vm.startPrank(_admin);
-        levX.acceptOwnership();
+        ext.acceptOwnership();
         address[] memory extensions = new address[](1);
-        extensions[0] = address(levX);
+        extensions[0] = address(ext);
         _registry.addGlobalExtensions(extensions);
         vm.stopPrank();
-        return levX;
-    }
-
-    function createLevXUniV3Extension(
-        address _admin,
-        IronBank _ironBank,
-        ExtensionRegistry _registry,
-        address _factory,
-        address _weth
-    ) internal returns (LevXUniV3Extension) {
-        LevXUniV3Extension levX = new LevXUniV3Extension(address(_ironBank), _factory, _weth);
-        levX.transferOwnership(_admin);
-        vm.startPrank(_admin);
-        levX.acceptOwnership();
-        address[] memory extensions = new address[](1);
-        extensions[0] = address(levX);
-        _registry.addGlobalExtensions(extensions);
-        vm.stopPrank();
-        return levX;
-    }
-
-    function createWethExtension(address _admin, IronBank _ironBank, ExtensionRegistry _registry, address _weth)
-        internal
-        returns (WethExtension)
-    {
-        WethExtension wethExtension = new WethExtension(address(_ironBank), _weth);
-
-        vm.startPrank(_admin);
-        address[] memory extensions = new address[](1);
-        extensions[0] = address(wethExtension);
-        _registry.addGlobalExtensions(extensions);
-        vm.stopPrank();
-        return wethExtension;
+        return ext;
     }
 }
