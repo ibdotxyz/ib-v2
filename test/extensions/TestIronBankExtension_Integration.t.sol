@@ -199,7 +199,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IERC20(DAI).safeIncreaseAllowance(address(extension), supplyAmount);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](2);
         actions[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(DAI, supplyAmount)});
-        actions[1] = IronBankExtension.Action({name: "BORROW_ASSET", data: abi.encode(USDT, borrowAmount)});
+        actions[1] = IronBankExtension.Action({name: "BORROW", data: abi.encode(USDT, borrowAmount)});
         extension.execute(actions);
         vm.stopPrank();
 

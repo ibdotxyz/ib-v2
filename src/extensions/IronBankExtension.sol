@@ -39,13 +39,25 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     bytes32 public constant ADD_COLLATERAL = "ADD_COLLATERAL";
 
     /// @notice The action for borrow asset
-    bytes32 public constant BORROW_ASSET = "BORROW_ASSET";
+    bytes32 public constant BORROW = "BORROW";
 
     /// @notice The action for leverage long thru uniswap v3
     bytes32 public constant LEVERAGE_LONG_THRU_UNISWAP_V3 = "LEVERAGE_LONG_THRU_UNISWAP_V3";
 
     /// @notice The action for leverage long thru uniswap v2
     bytes32 public constant LEVERAGE_LONG_THRU_UNISWAP_V2 = "LEVERAGE_LONG_THRU_UNISWAP_V2";
+
+    /// @notice The sub-action for open position thru external AMM.
+    bytes32 internal constant _OPEN_POSITION = "OPEN_POSITION";
+
+    /// @notice The sub-action for close position thru external AMM.
+    bytes32 internal constant _CLOSE_POSITION = "CLOSE_POSITION";
+
+    /// @notice The sub-action for swap debt thru external AMM.
+    bytes32 internal constant _DEBT_SWAP = "DEBT_SWAP";
+
+    /// @notice The sub-action for swap collateral thru external AMM.
+    bytes32 internal constant _COLLATERAL_SWAP = "COLLATERAL_SWAP";
 
     IronBankInterface public immutable ironBank;
     address public immutable uniV3Factory;
@@ -93,9 +105,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             } else if (action.name == ADD_COLLATERAL) {
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
                 addCollateral(asset, amount);
-            } else if (action.name == BORROW_ASSET) {
+            } else if (action.name == BORROW) {
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
-                borrowAsset(asset, amount);
+                borrow(asset, amount);
             } else if (action.name == LEVERAGE_LONG_THRU_UNISWAP_V3) {
                 (
                     address longAsset,
@@ -135,36 +147,44 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         IUniswapV3Pool pool = getUniV3Pool(tokenIn, tokenOut, fee);
         require(address(pool) == msg.sender, "invalid pool");
 
-        if (tokenOut == data.longAsset) {
-            IERC20(data.longAsset).safeIncreaseAllowance(address(ironBank), data.longAmount);
-            if (data.isOpenPosition) {
-                ironBank.enterMarket(data.caller, data.longAsset);
-                ironBank.supply(data.caller, data.longAsset, data.longAmount);
+        if (tokenOut == data.swapOutAsset) {
+            if (data.action == _OPEN_POSITION) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
+                ironBank.enterMarket(data.caller, data.swapOutAsset);
+                ironBank.supply(data.caller, data.swapOutAsset, data.swapOutAmount);
+            } else if (data.action == _CLOSE_POSITION) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
+                ironBank.repay(data.caller, data.swapOutAsset, data.swapOutAmount);
             } else {
-                ironBank.repay(data.caller, data.longAsset, data.longAmount);
+                revert("invalid action");
             }
         }
 
         uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
 
-        // Initiate the next swap or repay.
+        // Initiate the next swap or pay.
         if (data.path.hasMultiplePools()) {
             data.path = data.path.skipToken();
 
             // Make this pool as the recipient of the next swap.
             uniV3ExactOutputInternal(amountToPay, address(pool), data);
         } else {
-            require(tokenIn == data.shortAsset, "mismatch short asset");
-            require(amountToPay <= data.maxShortAmount, "short amount exceed max amount");
+            require(tokenIn == data.swapInAsset, "mismatch swap in asset");
+            require(amountToPay <= data.maxSwapInAmount, "swap in amount exceed max amount");
 
-            if (data.isOpenPosition) {
-                ironBank.borrow(data.caller, data.shortAsset, amountToPay);
+            if (data.action == _OPEN_POSITION) {
+                ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+
+                // Transfer the short asset to the pool.
+                IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
+            } else if (data.action == _CLOSE_POSITION) {
+                ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+
+                // Transfer the short asset to the pool.
+                IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
             } else {
-                ironBank.redeem(data.caller, data.shortAsset, amountToPay);
+                revert("invalid action");
             }
-
-            // Transfer the short asset to the pool.
-            IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
         }
     }
 
@@ -177,13 +197,16 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         require(address(pool) == msg.sender, "invalid pool");
         require(sender == address(this), "invalid sender");
 
-        if (tokenOut == data.longAsset) {
-            IERC20(data.longAsset).safeIncreaseAllowance(address(ironBank), data.longAmount);
-            if (data.isOpenPosition) {
-                ironBank.enterMarket(data.caller, data.longAsset);
-                ironBank.supply(data.caller, data.longAsset, data.longAmount);
+        if (tokenOut == data.swapOutAsset) {
+            if (data.action == _OPEN_POSITION) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
+                ironBank.enterMarket(data.caller, data.swapOutAsset);
+                ironBank.supply(data.caller, data.swapOutAsset, data.swapOutAmount);
+            } else if (data.action == _CLOSE_POSITION) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
+                ironBank.repay(data.caller, data.swapOutAsset, data.swapOutAmount);
             } else {
-                ironBank.repay(data.caller, data.longAsset, data.longAmount);
+                revert("invalid action");
             }
         }
 
@@ -192,19 +215,21 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             amount0 > 0 ? (amount0, reserve1, reserve0) : (amount1, reserve0, reserve1);
         uint256 amountToPay = UniswapV2Utils.getAmountIn(amountOut, reserveIn, reserveOut);
 
-        // Initiate the next swap or repay.
+        // Initiate the next swap or pay.
         if (data.index < data.path.length - 2) {
             // Array slice is only supported for calldata arrays, so we use an index to track the current token.
             data.index++;
             uniV2ExactOutputInternal(amountToPay, data);
         } else {
-            require(tokenIn == data.shortAsset, "mismatch short asset");
-            require(amountToPay <= data.maxShortAmount, "short amount exceed max amount");
+            require(tokenIn == data.swapInAsset, "mismatch swap in asset");
+            require(amountToPay <= data.maxSwapInAmount, "swap in amount exceed max amount");
 
-            if (data.isOpenPosition) {
-                ironBank.borrow(data.caller, data.shortAsset, amountToPay);
+            if (data.action == _OPEN_POSITION) {
+                ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+            } else if (data.action == _CLOSE_POSITION) {
+                ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
             } else {
-                ironBank.redeem(data.caller, data.shortAsset, amountToPay);
+                revert("invalid action");
             }
         }
 
@@ -295,19 +320,19 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param asset The address of the asset to borrow.
      * @param amount The amount of the asset to borrow.
      */
-    function borrowAsset(address asset, uint256 amount) internal nonReentrant {
+    function borrow(address asset, uint256 amount) internal nonReentrant {
         ironBank.borrow(msg.sender, asset, amount);
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
     struct UniV3SwapData {
         address caller;
-        address longAsset;
-        uint256 longAmount;
-        address shortAsset;
-        uint256 maxShortAmount;
+        address swapOutAsset;
+        uint256 swapOutAmount;
+        address swapInAsset;
+        uint256 maxSwapInAmount;
         bytes path;
-        bool isOpenPosition;
+        bytes32 action;
     }
 
     /**
@@ -352,25 +377,25 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             address(this),
             UniV3SwapData({
                 caller: msg.sender,
-                longAsset: longAsset,
-                longAmount: longAmount,
-                shortAsset: shortAsset,
-                maxShortAmount: maxShortAmount,
+                swapOutAsset: longAsset,
+                swapOutAmount: longAmount,
+                swapInAsset: shortAsset,
+                maxSwapInAmount: maxShortAmount,
                 path: uniV3Path,
-                isOpenPosition: isOpenPosition
+                action: isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
             })
         );
     }
 
     struct UniV2SwapData {
         address caller;
-        address longAsset;
-        uint256 longAmount;
-        address shortAsset;
-        uint256 maxShortAmount;
+        address swapOutAsset;
+        uint256 swapOutAmount;
+        address swapInAsset;
+        uint256 maxSwapInAmount;
         address[] path;
         uint256 index;
-        bool isOpenPosition;
+        bytes32 action;
     }
 
     /**
@@ -403,13 +428,13 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             longAmount,
             UniV2SwapData({
                 caller: msg.sender,
-                longAsset: longAsset,
-                longAmount: longAmount,
-                shortAsset: shortAsset,
-                maxShortAmount: maxShortAmount,
+                swapOutAsset: longAsset,
+                swapOutAmount: longAmount,
+                swapInAsset: shortAsset,
+                maxSwapInAmount: maxShortAmount,
                 path: path,
                 index: 0,
-                isOpenPosition: isOpenPosition
+                action: isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
             })
         );
     }
