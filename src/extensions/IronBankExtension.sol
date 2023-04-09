@@ -23,6 +23,10 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     using SafeCast for uint256;
     using SafeERC20 for IERC20;
 
+    /**
+     * User actions
+     */
+
     /// @notice The action for supply native token
     bytes32 public constant SUPPLY_NATIVE_TOKEN = "SUPPLY_NATIVE_TOKEN";
 
@@ -44,8 +48,24 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     /// @notice The action for leverage long thru uniswap v3
     bytes32 public constant LEVERAGE_LONG_THRU_UNISWAP_V3 = "LEVERAGE_LONG_THRU_UNISWAP_V3";
 
+    /// @notice The action for swap debt thru uniswap v3
+    bytes32 public constant SWAP_DEBT_THRU_UNISWAP_V3 = "SWAP_DEBT_THRU_UNISWAP_V3";
+
+    /// @notice The action for swap collateral thru uniswap v3
+    bytes32 public constant SWAP_COLLATERAL_THRU_UNISWAP_V3 = "SWAP_COLLATERAL_THRU_UNISWAP_V3";
+
     /// @notice The action for leverage long thru uniswap v2
     bytes32 public constant LEVERAGE_LONG_THRU_UNISWAP_V2 = "LEVERAGE_LONG_THRU_UNISWAP_V2";
+
+    /// @notice The action for swap debt thru uniswap v2
+    bytes32 public constant SWAP_DEBT_THRU_UNISWAP_V2 = "SWAP_DEBT_THRU_UNISWAP_V2";
+
+    /// @notice The action for swap collateral thru uniswap v2
+    bytes32 public constant SWAP_COLLATERAL_THRU_UNISWAP_V2 = "SWAP_COLLATERAL_THRU_UNISWAP_V2";
+
+    /**
+     * Internal actions
+     */
 
     /// @notice The sub-action for open position thru external AMM.
     bytes32 internal constant _OPEN_POSITION = "OPEN_POSITION";
@@ -54,10 +74,27 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     bytes32 internal constant _CLOSE_POSITION = "CLOSE_POSITION";
 
     /// @notice The sub-action for swap debt thru external AMM.
-    bytes32 internal constant _DEBT_SWAP = "DEBT_SWAP";
+    bytes32 internal constant _SWAP_DEBT = "SWAP_DEBT";
 
     /// @notice The sub-action for swap collateral thru external AMM.
-    bytes32 internal constant _COLLATERAL_SWAP = "COLLATERAL_SWAP";
+    bytes32 internal constant _SWAP_COLLATERAL = "SWAP_COLLATERAL";
+
+    /// @dev Used as the placeholder value for uniV3AmountInCached, uniV3AmountOutCached, uniV2AmountInCached and
+    /// uniV2AmountOutCached, because the computed amount in/out for an exact output/input swap can never actually be
+    /// this value.
+    uint256 private constant DEFAULT_AMOUNT_CACHED = type(uint256).max;
+
+    /// @dev Transient storage variable used for returning the computed amount in for an exact output Uniswap v3 swap.
+    uint256 private uniV3AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+    /// @dev Transient storage variable used for returning the computed amount in for an exact input Uniswap v3 swap.
+    uint256 private uniV3AmountOutCached = DEFAULT_AMOUNT_CACHED;
+
+    /// @dev Transient storage variable used for returning the computed amount in for an exact output Uniswap v2 swap.
+    uint256 private uniV2AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+    /// @dev Transient storage variable used for returning the computed amount in for an exact input Uniswap v2 swap.
+    uint256 private uniV2AmountOutCached = DEFAULT_AMOUNT_CACHED;
 
     IronBankInterface public immutable ironBank;
     address public immutable uniV3Factory;
@@ -118,7 +155,45 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     uint24[] memory fee,
                     bool isOpenPosition
                 ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[], bool));
-                leverageUniV3(longAsset, longAmount, shortAsset, maxShortAmount, path, fee, isOpenPosition);
+                uniV3SwapExactOut(
+                    longAsset,
+                    longAmount,
+                    shortAsset,
+                    maxShortAmount,
+                    path,
+                    fee,
+                    isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
+                );
+            } else if (action.name == SWAP_DEBT_THRU_UNISWAP_V3) {
+                (
+                    address fromBorrowAsset,
+                    uint256 fromBorrowAmount,
+                    address toBorrowAsset,
+                    uint256 maxToBorrowAmount,
+                    address[] memory path,
+                    uint24[] memory fee
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[]));
+                uniV3SwapExactOut(
+                    fromBorrowAsset, fromBorrowAmount, toBorrowAsset, maxToBorrowAmount, path, fee, _SWAP_DEBT
+                );
+            } else if (action.name == SWAP_COLLATERAL_THRU_UNISWAP_V3) {
+                (
+                    address fromCollateralAsset,
+                    uint256 fromCollateralAmount,
+                    address toCollateralAsset,
+                    uint256 minToCollateralAmount,
+                    address[] memory path,
+                    uint24[] memory fee
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[]));
+                uniV3SwapExactIn(
+                    fromCollateralAsset,
+                    fromCollateralAmount,
+                    toCollateralAsset,
+                    minToCollateralAmount,
+                    path,
+                    fee,
+                    _SWAP_COLLATERAL
+                );
             } else if (action.name == LEVERAGE_LONG_THRU_UNISWAP_V2) {
                 (
                     address longAsset,
@@ -128,7 +203,39 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     address[] memory path,
                     bool isOpenPosition
                 ) = abi.decode(action.data, (address, uint256, address, uint256, address[], bool));
-                leverageUniV2(longAsset, longAmount, shortAsset, maxShortAmount, path, isOpenPosition);
+                uniV2SwapExactOut(
+                    longAsset,
+                    longAmount,
+                    shortAsset,
+                    maxShortAmount,
+                    path,
+                    isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
+                );
+            } else if (action.name == SWAP_DEBT_THRU_UNISWAP_V2) {
+                (
+                    address fromBorrowAsset,
+                    uint256 fromBorrowAmount,
+                    address toBorrowAsset,
+                    uint256 maxToBorrowAmount,
+                    address[] memory path
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[]));
+                uniV2SwapExactOut(fromBorrowAsset, fromBorrowAmount, toBorrowAsset, maxToBorrowAmount, path, _SWAP_DEBT);
+            } else if (action.name == SWAP_COLLATERAL_THRU_UNISWAP_V2) {
+                (
+                    address fromCollateralAsset,
+                    uint256 fromCollateralAmount,
+                    address toCollateralAsset,
+                    uint256 minToCollateralAmount,
+                    address[] memory path
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[]));
+                uniV2SwapExactIn(
+                    fromCollateralAsset,
+                    fromCollateralAmount,
+                    toCollateralAsset,
+                    minToCollateralAmount,
+                    path,
+                    _SWAP_COLLATERAL
+                );
             } else {
                 revert("invalid action");
             }
@@ -139,110 +246,209 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         }
     }
 
+    struct UniV3SwapData {
+        address caller;
+        address swapOutAsset;
+        address swapInAsset;
+        bytes path;
+        bytes32 action;
+    }
+
     /// @inheritdoc IUniswapV3SwapCallback
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata _data) external {
         require(amount0Delta > 0 || amount1Delta > 0, "invalid amount");
         UniV3SwapData memory data = abi.decode(_data, (UniV3SwapData));
-        (address tokenOut, address tokenIn, uint24 fee) = data.path.decodeFirstPool();
+        (address tokenIn, address tokenOut, uint24 fee) = data.path.decodeFirstPool();
         IUniswapV3Pool pool = getUniV3Pool(tokenIn, tokenOut, fee);
         require(address(pool) == msg.sender, "invalid pool");
 
-        if (tokenOut == data.swapOutAsset) {
-            if (data.action == _OPEN_POSITION) {
-                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
-                ironBank.enterMarket(data.caller, data.swapOutAsset);
-                ironBank.supply(data.caller, data.swapOutAsset, data.swapOutAmount);
-            } else if (data.action == _CLOSE_POSITION) {
-                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
-                ironBank.repay(data.caller, data.swapOutAsset, data.swapOutAmount);
+        (bool isExactInput, uint256 amountToPay, uint256 amountReceived) = amount0Delta > 0
+            ? (tokenIn < tokenOut, uint256(amount0Delta), uint256(-amount1Delta))
+            : (tokenOut < tokenIn, uint256(amount1Delta), uint256(-amount0Delta));
+
+        if (isExactInput) {
+            // Initiate the next swap or pay.
+            if (data.path.hasMultiplePools()) {
+                data.path = data.path.skipToken();
+
+                uniV3ExactInputInternal(amountReceived, address(this), data);
             } else {
-                revert("invalid action");
+                require(tokenOut == data.swapOutAsset, "mismatch swap out asset");
+
+                uniV3AmountOutCached = amountReceived;
+
+                if (data.action == _SWAP_COLLATERAL) {
+                    IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                    ironBank.enterMarket(data.caller, data.swapOutAsset);
+                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else {
+                    revert("invalid action");
+                }
             }
-        }
 
-        uint256 amountToPay = amount0Delta > 0 ? uint256(amount0Delta) : uint256(amount1Delta);
+            if (tokenIn == data.swapInAsset) {
+                if (data.action == _SWAP_COLLATERAL) {
+                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                } else {
+                    revert("invalid action");
+                }
+            }
 
-        // Initiate the next swap or pay.
-        if (data.path.hasMultiplePools()) {
-            data.path = data.path.skipToken();
-
-            // Make this pool as the recipient of the next swap.
-            uniV3ExactOutputInternal(amountToPay, address(pool), data);
+            // Although we already know the amount to pay, we can't pay it at the beginning, because we can't redeem or
+            // borrow for users until we supply or repay for users in the last step of the swap.
+            IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
         } else {
-            require(tokenIn == data.swapInAsset, "mismatch swap in asset");
-            require(amountToPay <= data.maxSwapInAmount, "swap in amount exceed max amount");
+            if (tokenIn == data.swapOutAsset) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                if (data.action == _OPEN_POSITION) {
+                    ironBank.enterMarket(data.caller, data.swapOutAsset);
+                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else if (data.action == _CLOSE_POSITION || data.action == _SWAP_DEBT) {
+                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                } else {
+                    revert("invalid action");
+                }
+            }
 
-            if (data.action == _OPEN_POSITION) {
-                ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+            // Initiate the next swap or pay.
+            if (data.path.hasMultiplePools()) {
+                data.path = data.path.skipToken();
 
-                // Transfer the short asset to the pool.
-                IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
-            } else if (data.action == _CLOSE_POSITION) {
-                ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
-
-                // Transfer the short asset to the pool.
-                IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
+                // Make this pool as the recipient of the next swap.
+                uniV3ExactOutputInternal(amountToPay, address(pool), data);
             } else {
-                revert("invalid action");
+                require(tokenOut == data.swapInAsset, "mismatch swap in asset");
+
+                uniV3AmountInCached = amountToPay;
+
+                if (data.action == _OPEN_POSITION || data.action == _SWAP_DEBT) {
+                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                } else if (data.action == _CLOSE_POSITION) {
+                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                } else {
+                    revert("invalid action");
+                }
+
+                // Transfer the asset to the pool.
+                IERC20(tokenOut).safeTransfer(address(pool), amountToPay);
             }
         }
+    }
+
+    struct UniV2SwapData {
+        address caller;
+        address swapOutAsset;
+        address swapInAsset;
+        uint256[] amounts;
+        address[] path;
+        uint256 index;
+        bytes32 action;
     }
 
     /// @inheritdoc IUniswapV2Callee
     function uniswapV2Call(address sender, uint256 amount0, uint256 amount1, bytes calldata _data) external {
         require(amount0 > 0 || amount1 > 0, "invalid amount");
         UniV2SwapData memory data = abi.decode(_data, (UniV2SwapData));
-        (address tokenOut, address tokenIn) = (data.path[data.index], data.path[data.index + 1]);
+        (address tokenIn, address tokenOut) = (data.path[data.index], data.path[data.index + 1]);
         IUniswapV2Pair pool = getUniV2Pool(tokenIn, tokenOut);
         require(address(pool) == msg.sender, "invalid pool");
         require(sender == address(this), "invalid sender");
 
-        if (tokenOut == data.swapOutAsset) {
-            if (data.action == _OPEN_POSITION) {
-                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
-                ironBank.enterMarket(data.caller, data.swapOutAsset);
-                ironBank.supply(data.caller, data.swapOutAsset, data.swapOutAmount);
-            } else if (data.action == _CLOSE_POSITION) {
-                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), data.swapOutAmount);
-                ironBank.repay(data.caller, data.swapOutAsset, data.swapOutAmount);
+        /**
+         *             amounts[0]  amounts[1]  amounts[2]   ...
+         * exactInput:  pay      -> receive
+         *                          pay      -> receive
+         *                                      pay      -> ...
+         * exactOutput: receive  <- pay
+         *                          receive  <- pay
+         *                                      receive  <- ...
+         */
+        (bool isExactInput, uint256 amountReceived) =
+            amount0 > 0 ? (tokenIn > tokenOut, amount0) : (tokenIn < tokenOut, amount1);
+        uint256 amountToPay = isExactInput ? data.amounts[data.index] : data.amounts[data.index + 1];
+
+        if (isExactInput) {
+            // Initiate the next swap or pay.
+            if (data.index < data.path.length - 2) {
+                // Array slice is only supported for calldata arrays, so we use an index to track the current token.
+                data.index++;
+                uniV2ExactInputInternal(data);
             } else {
-                revert("invalid action");
+                require(tokenOut == data.swapOutAsset, "mismatch swap out asset");
+
+                uniV2AmountOutCached = amountReceived;
+
+                if (data.action == _SWAP_COLLATERAL) {
+                    IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                    ironBank.enterMarket(data.caller, data.swapOutAsset);
+                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else {
+                    revert("invalid action");
+                }
             }
-        }
 
-        (uint256 reserve0, uint256 reserve1,) = pool.getReserves();
-        (uint256 amountOut, uint256 reserveIn, uint256 reserveOut) =
-            amount0 > 0 ? (amount0, reserve1, reserve0) : (amount1, reserve0, reserve1);
-        uint256 amountToPay = UniswapV2Utils.getAmountIn(amountOut, reserveIn, reserveOut);
+            if (tokenIn == data.swapInAsset) {
+                if (data.action == _SWAP_COLLATERAL) {
+                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                } else {
+                    revert("invalid action");
+                }
+            }
 
-        // Initiate the next swap or pay.
-        if (data.index < data.path.length - 2) {
-            // Array slice is only supported for calldata arrays, so we use an index to track the current token.
-            data.index++;
-            uniV2ExactOutputInternal(amountToPay, data);
+            // Since we can't make the recipient of the swap as the Uniswap v3 pool, we need to transfer the token to the pool.
+            IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
         } else {
-            require(tokenIn == data.swapInAsset, "mismatch swap in asset");
-            require(amountToPay <= data.maxSwapInAmount, "swap in amount exceed max amount");
-
-            if (data.action == _OPEN_POSITION) {
-                ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
-            } else if (data.action == _CLOSE_POSITION) {
-                ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
-            } else {
-                revert("invalid action");
+            if (tokenIn == data.swapOutAsset) {
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                if (data.action == _OPEN_POSITION) {
+                    ironBank.enterMarket(data.caller, data.swapOutAsset);
+                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else if (data.action == _CLOSE_POSITION || data.action == _SWAP_DEBT) {
+                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                } else {
+                    revert("invalid action");
+                }
             }
-        }
 
-        // Since we can't make the recipient of the swap as the Uniswap v2 pool, we need to transfer the token to the pool.
-        IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
+            // Initiate the next swap or pay.
+            if (data.index < data.path.length - 2) {
+                // Array slice is only supported for calldata arrays, so we use an index to track the current token.
+                data.index++;
+                uniV2ExactOutputInternal(data);
+            } else {
+                require(tokenOut == data.swapInAsset, "mismatch swap in asset");
+
+                uniV2AmountInCached = amountToPay;
+
+                if (data.action == _OPEN_POSITION || data.action == _SWAP_DEBT) {
+                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                } else if (data.action == _CLOSE_POSITION) {
+                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                } else {
+                    revert("invalid action");
+                }
+            }
+
+            // Since we can't make the recipient of the swap as the Uniswap v3 pool, we need to transfer the token to the pool.
+            IERC20(tokenOut).safeTransfer(address(pool), amountToPay);
+        }
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
+    /**
+     * @notice Admin seizes the asset from the contract.
+     * @param recipient The recipient of the seized asset.
+     * @param asset The asset to seize.
+     */
     function seize(address recipient, address asset) external onlyOwner {
         IERC20(asset).safeTransfer(recipient, IERC20(asset).balanceOf(address(this)));
     }
 
+    /**
+     * @notice Admin seizes the native token from the contract.
+     * @param recipient The recipient of the seized native token.
+     */
     function seizeNative(address recipient) external onlyOwner {
         (bool sent,) = recipient.call{value: address(this).balance}("");
         require(sent, "failed to send native token");
@@ -325,43 +531,33 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         IERC20(asset).safeTransfer(msg.sender, amount);
     }
 
-    struct UniV3SwapData {
-        address caller;
-        address swapOutAsset;
-        uint256 swapOutAmount;
-        address swapInAsset;
-        uint256 maxSwapInAmount;
-        bytes path;
-        bytes32 action;
-    }
-
     /**
-     * @notice Leverage long on Iron Bank through Uniswap v3.
-     * @param longAsset The address of the long asset.
-     * @param longAmount The amount of the long asset to supply.
-     * @param shortAsset The address of the short asset.
-     * @param maxShortAmount The maximum amount of the short asset to borrow.
+     * @notice Flash exact output swap from Uniswap v3.
+     * @param swapOutAsset The address of the swap out asset.
+     * @param swapOutAmount The amount of the swap out asset.
+     * @param swapInAsset The address of the swap in asset.
+     * @param maxSwapInAmount The maximum amount of the swap in asset.
      * @param path The path of the Uniswap v3 swap.
      * @param fee The fee of the Uniswap v3 swap.
-     * @param isOpenPosition Whether to open a new position or close an existing position.
+     * @param action The sub-action for Iron Bank.
      */
-    function leverageUniV3(
-        address longAsset,
-        uint256 longAmount,
-        address shortAsset,
-        uint256 maxShortAmount,
+    function uniV3SwapExactOut(
+        address swapOutAsset,
+        uint256 swapOutAmount,
+        address swapInAsset,
+        uint256 maxSwapInAmount,
         address[] memory path,
         uint24[] memory fee,
-        bool isOpenPosition
+        bytes32 action
     ) internal nonReentrant {
-        require(longAsset != shortAsset, "invalid long or short asset");
-        if (longAmount == type(uint256).max) {
-            require(!isOpenPosition);
-            ironBank.accrueInterest(longAsset);
-            longAmount = ironBank.getBorrowBalance(msg.sender, longAsset);
+        require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
+        if (swapOutAmount == type(uint256).max) {
+            require(action == _CLOSE_POSITION || action == _SWAP_DEBT);
+            ironBank.accrueInterest(swapOutAsset);
+            swapOutAmount = ironBank.getBorrowBalance(msg.sender, swapOutAsset);
         }
-        require(longAmount > 0, "invalid long amount");
-        require(path.length >= 2 && path[0] == longAsset && path[path.length - 1] == shortAsset, "invalid path");
+        require(swapOutAmount > 0, "invalid swap out amount");
+        require(path.length >= 2 && path[0] == swapOutAsset && path[path.length - 1] == swapInAsset, "invalid path");
         require(fee.length == path.length - 1, "invalid fee");
 
         bytes memory uniV3Path;
@@ -373,70 +569,164 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         }
 
         uniV3ExactOutputInternal(
-            longAmount,
+            swapOutAmount,
             address(this),
             UniV3SwapData({
                 caller: msg.sender,
-                swapOutAsset: longAsset,
-                swapOutAmount: longAmount,
-                swapInAsset: shortAsset,
-                maxSwapInAmount: maxShortAmount,
+                swapOutAsset: swapOutAsset,
+                swapInAsset: swapInAsset,
                 path: uniV3Path,
-                action: isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
+                action: action
             })
         );
-    }
 
-    struct UniV2SwapData {
-        address caller;
-        address swapOutAsset;
-        uint256 swapOutAmount;
-        address swapInAsset;
-        uint256 maxSwapInAmount;
-        address[] path;
-        uint256 index;
-        bytes32 action;
+        uint256 amountIn = uniV3AmountInCached;
+        require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
+        uniV3AmountInCached = DEFAULT_AMOUNT_CACHED;
     }
 
     /**
-     * @notice Leverage long on Iron Bank through Uniswap v2.
-     * @param longAsset The address of the long asset.
-     * @param longAmount The amount of the long asset to supply.
-     * @param shortAsset The address of the short asset.
-     * @param maxShortAmount The maximum amount of the short asset to borrow.
-     * @param path The path of the Uniswap v2 swap.
-     * @param isOpenPosition Whether to open a new position or close an existing position.
+     * @notice Flash exact input swap from Uniswap v3.
+     * @param swapInAsset The address of the swap in asset.
+     * @param swapInAmount The amount of the swap in asset.
+     * @param swapOutAsset The address of the swap out asset.
+     * @param minSwapOutAmount The minimum amount of the swap out asset.
+     * @param path The path of the Uniswap v3 swap.
+     * @param fee The fee of the Uniswap v3 swap.
+     * @param action The sub-action for Iron Bank.
      */
-    function leverageUniV2(
-        address longAsset,
-        uint256 longAmount,
-        address shortAsset,
-        uint256 maxShortAmount,
+    function uniV3SwapExactIn(
+        address swapInAsset,
+        uint256 swapInAmount,
+        address swapOutAsset,
+        uint256 minSwapOutAmount,
         address[] memory path,
-        bool isOpenPosition
+        uint24[] memory fee,
+        bytes32 action
     ) internal nonReentrant {
-        require(longAsset != shortAsset, "invalid long or short asset");
-        if (longAmount == type(uint256).max) {
-            require(!isOpenPosition);
-            ironBank.accrueInterest(longAsset);
-            longAmount = ironBank.getBorrowBalance(msg.sender, longAsset);
+        require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
+        if (swapInAmount == type(uint256).max) {
+            require(action == _SWAP_COLLATERAL);
+            ironBank.accrueInterest(swapOutAsset);
+            swapInAmount = ironBank.getSupplyBalance(msg.sender, swapInAsset);
         }
-        require(longAmount > 0, "invalid long amount");
-        require(path.length >= 2 && path[0] == longAsset && path[path.length - 1] == shortAsset, "invalid path");
+        require(swapInAmount > 0, "invalid swap in amount");
+        require(path.length >= 2 && path[0] == swapInAsset && path[path.length - 1] == swapOutAsset, "invalid path");
+        require(fee.length == path.length - 1, "invalid fee");
 
-        uniV2ExactOutputInternal(
-            longAmount,
-            UniV2SwapData({
+        bytes memory uniV3Path;
+        for (uint256 i = 0; i < path.length; i++) {
+            uniV3Path = abi.encodePacked(uniV3Path, path[i]);
+            if (i != path.length - 1) {
+                uniV3Path = abi.encodePacked(uniV3Path, fee[i]);
+            }
+        }
+
+        uniV3ExactInputInternal(
+            swapInAmount,
+            address(this),
+            UniV3SwapData({
                 caller: msg.sender,
-                swapOutAsset: longAsset,
-                swapOutAmount: longAmount,
-                swapInAsset: shortAsset,
-                maxSwapInAmount: maxShortAmount,
-                path: path,
-                index: 0,
-                action: isOpenPosition ? _OPEN_POSITION : _CLOSE_POSITION
+                swapOutAsset: swapOutAsset,
+                swapInAsset: swapInAsset,
+                path: uniV3Path,
+                action: action
             })
         );
+
+        uint256 amountOut = uniV3AmountOutCached;
+        require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
+        uniV3AmountOutCached = DEFAULT_AMOUNT_CACHED;
+    }
+
+    /**
+     * @notice Flash exact output swap from Uniswap v2.
+     * @param swapOutAsset The address of the swap out asset.
+     * @param swapOutAmount The amount of the swap out asset.
+     * @param swapInAsset The address of the swap in asset.
+     * @param maxSwapInAmount The maximum amount of the swap in asset.
+     * @param path The path of the Uniswap v2 swap.
+     * @param action The sub-action for Iron Bank.
+     */
+    function uniV2SwapExactOut(
+        address swapOutAsset,
+        uint256 swapOutAmount,
+        address swapInAsset,
+        uint256 maxSwapInAmount,
+        address[] memory path,
+        bytes32 action
+    ) internal nonReentrant {
+        require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
+        if (swapOutAmount == type(uint256).max) {
+            require(action == _CLOSE_POSITION || action == _SWAP_DEBT);
+            ironBank.accrueInterest(swapOutAsset);
+            swapOutAmount = ironBank.getBorrowBalance(msg.sender, swapOutAsset);
+        }
+        require(swapOutAmount > 0, "invalid swap out amount");
+        require(path.length >= 2 && path[0] == swapOutAsset && path[path.length - 1] == swapInAsset, "invalid path");
+
+        uint256[] memory amounts = UniswapV2Utils.getAmountsIn(uniV2Factory, swapOutAmount, path);
+
+        uniV2ExactOutputInternal(
+            UniV2SwapData({
+                caller: msg.sender,
+                swapOutAsset: swapOutAsset,
+                swapInAsset: swapInAsset,
+                amounts: amounts,
+                path: path,
+                index: 0,
+                action: action
+            })
+        );
+
+        uint256 amountIn = uniV2AmountInCached;
+        require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
+        uniV2AmountInCached = DEFAULT_AMOUNT_CACHED;
+    }
+
+    /**
+     * @notice Flash exact input swap from Uniswap v2.
+     * @param swapInAsset The address of the swap in asset.
+     * @param swapInAmount The amount of the swap in asset.
+     * @param swapOutAsset The address of the swap out asset.
+     * @param minSwapOutAmount The minimum amount of the swap out asset.
+     * @param path The path of the Uniswap v2 swap.
+     * @param action The sub-action for Iron Bank.
+     */
+    function uniV2SwapExactIn(
+        address swapInAsset,
+        uint256 swapInAmount,
+        address swapOutAsset,
+        uint256 minSwapOutAmount,
+        address[] memory path,
+        bytes32 action
+    ) internal nonReentrant {
+        require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
+        if (swapInAmount == type(uint256).max) {
+            require(action == _SWAP_COLLATERAL);
+            ironBank.accrueInterest(swapOutAsset);
+            swapInAmount = ironBank.getSupplyBalance(msg.sender, swapInAsset);
+        }
+        require(swapInAmount > 0, "invalid swap in amount");
+        require(path.length >= 2 && path[0] == swapInAsset && path[path.length - 1] == swapOutAsset, "invalid path");
+
+        uint256[] memory amounts = UniswapV2Utils.getAmountsOut(uniV2Factory, swapInAmount, path);
+
+        uniV2ExactInputInternal(
+            UniV2SwapData({
+                caller: msg.sender,
+                swapOutAsset: swapOutAsset,
+                swapInAsset: swapInAsset,
+                amounts: amounts,
+                path: path,
+                index: 0,
+                action: action
+            })
+        );
+
+        uint256 amountOut = uniV2AmountOutCached;
+        require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
+        uniV2AmountOutCached = DEFAULT_AMOUNT_CACHED;
     }
 
     /**
@@ -445,29 +735,78 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param recipient The address to receive the asset.
      * @param data The swap data.
      */
-    function uniV3ExactOutputInternal(uint256 amountOut, address recipient, UniV3SwapData memory data) private {
+    function uniV3ExactOutputInternal(uint256 amountOut, address recipient, UniV3SwapData memory data)
+        private
+        returns (uint256 amountIn)
+    {
         (address tokenOut, address tokenIn, uint24 fee) = data.path.decodeFirstPool();
 
         bool zeroForOne = tokenIn < tokenOut;
 
-        getUniV3Pool(tokenIn, tokenOut, fee).swap(
+        (int256 amount0Delta, int256 amount1Delta) = getUniV3Pool(tokenIn, tokenOut, fee).swap(
             recipient,
             zeroForOne,
             -amountOut.toInt256(),
             zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1,
             abi.encode(data)
         );
+
+        uint256 amountOutReceived;
+        (amountIn, amountOutReceived) = zeroForOne
+            ? (uint256(amount0Delta), uint256(-amount1Delta))
+            : (uint256(amount1Delta), uint256(-amount0Delta));
+        require(amountOutReceived == amountOut);
+    }
+
+    /**
+     * @notice Exact input swap on Uniswap v3.
+     * @param amountIn The amount of the input asset.
+     * @param recipient The address to receive the asset.
+     * @param data The swap data.
+     */
+    function uniV3ExactInputInternal(uint256 amountIn, address recipient, UniV3SwapData memory data)
+        private
+        returns (uint256 amountOut)
+    {
+        (address tokenIn, address tokenOut, uint24 fee) = data.path.decodeFirstPool();
+
+        bool zeroForOne = tokenIn < tokenOut;
+
+        (int256 amount0, int256 amount1) = getUniV3Pool(tokenIn, tokenOut, fee).swap(
+            recipient,
+            zeroForOne,
+            amountIn.toInt256(),
+            zeroForOne ? TickMath.MIN_SQRT_RATIO + 1 : TickMath.MAX_SQRT_RATIO - 1,
+            abi.encode(data)
+        );
+
+        return uint256(-(zeroForOne ? amount1 : amount0));
     }
 
     /**
      * @notice Exact output swap on Uniswap v2.
-     * @param amountOut The amount of the output asset.
      * @param data The swap data.
      */
-    function uniV2ExactOutputInternal(uint256 amountOut, UniV2SwapData memory data) private {
+    function uniV2ExactOutputInternal(UniV2SwapData memory data) private {
         (address tokenA, address tokenB) = (data.path[data.index], data.path[data.index + 1]);
 
+        uint256 amountOut = data.amounts[data.index];
+
         (uint256 amount0, uint256 amount1) = tokenA < tokenB ? (amountOut, uint256(0)) : (uint256(0), amountOut);
+
+        getUniV2Pool(tokenA, tokenB).swap(amount0, amount1, address(this), abi.encode(data));
+    }
+
+    /**
+     * @notice Exact input swap on Uniswap v2.
+     * @param data The swap data.
+     */
+    function uniV2ExactInputInternal(UniV2SwapData memory data) private {
+        (address tokenA, address tokenB) = (data.path[data.index], data.path[data.index + 1]);
+
+        uint256 amountOut = data.amounts[data.index + 1];
+
+        (uint256 amount0, uint256 amount1) = tokenA < tokenB ? (uint256(0), amountOut) : (amountOut, uint256(0));
 
         getUniV2Pool(tokenA, tokenB).swap(amount0, amount1, address(this), abi.encode(data));
     }
