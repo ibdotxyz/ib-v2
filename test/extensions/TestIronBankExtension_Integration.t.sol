@@ -99,7 +99,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.prank(user1);
         vm.deal(user1, supplyAmount);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = IronBankExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
         extension.execute{value: supplyAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -114,7 +114,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        actions[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
         extension.execute(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -133,7 +133,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "REDEEM_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        actions[0] = IronBankExtension.Action({name: "ACTION_REDEEM_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
         extension.execute(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -147,7 +147,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](1);
-        actions1[0] = IronBankExtension.Action({name: "BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
         extension.execute(actions1);
 
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
@@ -155,7 +155,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({name: "REPAY_NATIVE_TOKEN", data: bytes("")});
+        actions2[0] = IronBankExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
         extension.execute{value: repayAmount}(actions2);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -169,7 +169,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](1);
-        actions1[0] = IronBankExtension.Action({name: "BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
         extension.execute(actions1);
 
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
@@ -178,7 +178,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.prank(user1);
         vm.deal(user1, repayAmount);
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({name: "REPAY_NATIVE_TOKEN", data: bytes("")});
+        actions2[0] = IronBankExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
         extension.execute{value: repayAmount}(actions2);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -198,8 +198,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(extension), supplyAmount);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](2);
-        actions[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(DAI, supplyAmount)});
-        actions[1] = IronBankExtension.Action({name: "BORROW", data: abi.encode(USDT, borrowAmount)});
+        actions[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, supplyAmount)});
+        actions[1] = IronBankExtension.Action({name: "ACTION_BORROW", data: abi.encode(USDT, borrowAmount)});
         extension.execute(actions);
         vm.stopPrank();
 
@@ -228,10 +228,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, fees, true)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
@@ -246,8 +246,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[1] = 500; // 0.05%
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(DAI, type(uint256).max, WETH, type(uint256).max, path, fees, false)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(
+                DAI, type(uint256).max, WETH, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
 
@@ -273,10 +275,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](1);
         fees[0] = 3000; // 0.3%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(USDT, longAmount, WETH, type(uint256).max, path, fees, true)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(
+                USDT, longAmount, WETH, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION")
+                )
         });
         extension.execute(actions1);
 
@@ -288,8 +292,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDT;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(WETH, type(uint256).max, USDT, type(uint256).max, path, fees, false)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(
+                WETH, type(uint256).max, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
         (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
@@ -316,10 +322,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, fees, true)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
@@ -332,8 +338,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[2] = DAI;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V3",
-            data: abi.encode(USDT, type(uint256).max, DAI, type(uint256).max, path, fees, false)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(
+                USDT, type(uint256).max, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
         (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
@@ -366,8 +374,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
-            name: "SWAP_DEBT_THRU_UNISWAP_V3",
-            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, fees)
+            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
+            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_SWAP_DEBT"))
         });
         extension.execute(actions);
 
@@ -399,8 +407,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
-            name: "SWAP_COLLATERAL_THRU_UNISWAP_V3",
-            data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees)
+            name: "ACTION_UNISWAP_V3_EXACT_INPUT",
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_SWAP_COLLATERAL"))
         });
         extension.execute(actions);
 
@@ -423,10 +431,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDC;
         path[2] = DAI;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, true)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
@@ -439,8 +447,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[2] = WETH;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(DAI, type(uint256).max, WETH, type(uint256).max, path, false)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(
+                DAI, type(uint256).max, WETH, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
 
@@ -464,10 +474,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = USDT;
         path[1] = WETH;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(USDT, longAmount, WETH, type(uint256).max, path, true)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(USDT, longAmount, WETH, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
@@ -479,8 +489,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDT;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(WETH, type(uint256).max, USDT, type(uint256).max, path, false)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(
+                WETH, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
 
@@ -505,10 +517,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDC;
         path[2] = USDT;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, true)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
@@ -521,8 +533,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[2] = DAI;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "LEVERAGE_LONG_THRU_UNISWAP_V2",
-            data: abi.encode(USDT, type(uint256).max, DAI, type(uint256).max, path, false)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(
+                USDT, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                )
         });
         extension.execute(actions2);
 
@@ -553,8 +567,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[2] = USDT;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
-            name: "SWAP_DEBT_THRU_UNISWAP_V2",
-            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path)
+            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
+            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_SWAP_DEBT"))
         });
         extension.execute(actions);
 
@@ -583,8 +597,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[2] = USDT;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
-            name: "SWAP_COLLATERAL_THRU_UNISWAP_V2",
-            data: abi.encode(DAI, supplyAmount, USDT, 0, path)
+            name: "ACTION_UNISWAP_V2_EXACT_INPUT",
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path, bytes32("SUB_ACTION_SWAP_COLLATERAL"))
         });
         extension.execute(actions);
 
