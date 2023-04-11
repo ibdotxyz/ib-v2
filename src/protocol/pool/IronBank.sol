@@ -105,6 +105,12 @@ contract IronBank is
         return _getBorrowBalance(m, user);
     }
 
+    function getSupplyBalance(address user, address market) public view returns (uint256) {
+        Market storage m = markets[market];
+        uint256 ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
+        return (ibTokenAmount * _getExchangeRate(m)) / 1e18;
+    }
+
     function getUserCollateralBalance(address user, address market) public view returns (uint256) {
         return markets[market].userCollaterals[user];
     }

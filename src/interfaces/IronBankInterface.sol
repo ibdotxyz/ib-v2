@@ -25,6 +25,8 @@ interface IronBankInterface {
 
     function getBorrowBalance(address user, address market) external view returns (uint256);
 
+    function getSupplyBalance(address user, address market) external view returns (uint256);
+
     function isMarketListed(address market) external view returns (bool);
 
     function getMaxBorrowAmount(address market) external view returns (uint256);

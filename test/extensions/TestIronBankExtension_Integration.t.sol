@@ -342,6 +342,72 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.stopPrank();
     }
 
+    function testSwapDebtThruUniV3() public {
+        /**
+         * Swap 100 DAI debt to USDT.
+         * Path: DAI -> USDC -> USDT
+         */
+        prepareBorrow();
+
+        uint256 borrowAmount = 100e18;
+
+        vm.startPrank(user1);
+        ib.borrow(user1, DAI, borrowAmount);
+
+        assertTrue(ib.getBorrowBalance(user1, DAI) == borrowAmount);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
+        path[1] = USDC;
+        path[2] = USDT;
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 100; // 0.01%
+        fees[1] = 100; // 0.01%
+        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
+        actions[0] = IronBankExtension.Action({
+            name: "SWAP_DEBT_THRU_UNISWAP_V3",
+            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, fees)
+        });
+        extension.execute(actions);
+
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
+    }
+
+    function testSwapCollateralThruUniV3() public {
+        /**
+         * Swap 100 DAI collateral to USDT.
+         * Path: DAI -> USDC -> USDT
+         */
+        uint256 supplyAmount = 100e18;
+
+        vm.startPrank(user1);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
+        ib.supply(user1, DAI, supplyAmount);
+        ib.enterMarket(user1, DAI);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
+        path[1] = USDC;
+        path[2] = USDT;
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 100; // 0.01%
+        fees[1] = 100; // 0.01%
+        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
+        actions[0] = IronBankExtension.Action({
+            name: "SWAP_COLLATERAL_THRU_UNISWAP_V3",
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees)
+        });
+        extension.execute(actions);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
+    }
+
     function testLongWethAgainstDaiThruUniV2() public {
         /**
          * Long 100 WETH.
@@ -464,6 +530,66 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         assertTrue(collateralValue > 0);
         assertTrue(debtValue == 0);
         vm.stopPrank();
+    }
+
+    function testSwapDebtThruUniV2() public {
+        /**
+         * Swap 100 DAI debt to USDT.
+         * Path: DAI -> USDC -> USDT
+         */
+        prepareBorrow();
+
+        uint256 borrowAmount = 100e18;
+
+        vm.startPrank(user1);
+        ib.borrow(user1, DAI, borrowAmount);
+
+        assertTrue(ib.getBorrowBalance(user1, DAI) == borrowAmount);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
+        path[1] = USDC;
+        path[2] = USDT;
+        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
+        actions[0] = IronBankExtension.Action({
+            name: "SWAP_DEBT_THRU_UNISWAP_V2",
+            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path)
+        });
+        extension.execute(actions);
+
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
+    }
+
+    function testSwapCollateralThruUniV2() public {
+        /**
+         * Swap 100 DAI collateral to USDT.
+         * Path: DAI -> USDC -> USDT
+         */
+        uint256 supplyAmount = 100e18;
+
+        vm.startPrank(user1);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
+        ib.supply(user1, DAI, supplyAmount);
+        ib.enterMarket(user1, DAI);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
+        path[1] = USDC;
+        path[2] = USDT;
+        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
+        actions[0] = IronBankExtension.Action({
+            name: "SWAP_COLLATERAL_THRU_UNISWAP_V2",
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path)
+        });
+        extension.execute(actions);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
     }
 
     function prepareBorrow() internal {
