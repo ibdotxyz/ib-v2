@@ -395,7 +395,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 }
             }
 
-            // Since we can't make the recipient of the swap as the Uniswap v3 pool, we need to transfer the token to the pool.
+            // Transfer the token to the pool and conclude the swap.
             IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
         } else {
             if (tokenIn == data.swapOutAsset) {
@@ -429,7 +429,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 }
             }
 
-            // Since we can't make the recipient of the swap as the Uniswap v3 pool, we need to transfer the token to the pool.
+            // Transfer the token to the pool and conclude the swap.
             IERC20(tokenOut).safeTransfer(address(pool), amountToPay);
         }
     }
