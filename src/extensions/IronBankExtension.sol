@@ -98,6 +98,15 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     address public immutable weth;
 
     /**
+     * @notice Modifier to check if the deadline has passed
+     * @param deadline The deadline to check
+     */
+    modifier checkDeadline(uint256 deadline) {
+        require(block.timestamp <= deadline, "Transaction too old");
+        _;
+    }
+
+    /**
      * @notice Construct a new IronBankExtension contract
      * @param ironBank_ The IronBank contract
      * @param uniV3Factory_ The Uniswap V3 factory contract
@@ -149,9 +158,12 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     uint256 maxSwapInAmount,
                     address[] memory path,
                     uint24[] memory fee,
-                    bytes32 subAction
-                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[], bytes32));
-                uniV3SwapExactOut(swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, fee, subAction);
+                    bytes32 subAction,
+                    uint256 deadline
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[], bytes32, uint256));
+                uniV3SwapExactOut(
+                    swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, fee, subAction, deadline
+                );
             } else if (action.name == ACTION_UNISWAP_V3_EXACT_INPUT) {
                 (
                     address swapInAsset,
@@ -160,9 +172,12 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     uint256 minSwapOutAmount,
                     address[] memory path,
                     uint24[] memory fee,
-                    bytes32 subAction
-                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[], bytes32));
-                uniV3SwapExactIn(swapInAsset, swapInAmount, swapOutAsset, minSwapOutAmount, path, fee, subAction);
+                    bytes32 subAction,
+                    uint256 deadline
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], uint24[], bytes32, uint256));
+                uniV3SwapExactIn(
+                    swapInAsset, swapInAmount, swapOutAsset, minSwapOutAmount, path, fee, subAction, deadline
+                );
             } else if (action.name == ACTION_UNISWAP_V2_EXACT_OUTPUT) {
                 (
                     address swapOutAsset,
@@ -170,9 +185,10 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     address swapInAsset,
                     uint256 maxSwapInAmount,
                     address[] memory path,
-                    bytes32 subAction
-                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], bytes32));
-                uniV2SwapExactOut(swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, subAction);
+                    bytes32 subAction,
+                    uint256 deadline
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], bytes32, uint256));
+                uniV2SwapExactOut(swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, subAction, deadline);
             } else if (action.name == ACTION_UNISWAP_V2_EXACT_INPUT) {
                 (
                     address swapOutAsset,
@@ -180,9 +196,10 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                     address swapInAsset,
                     uint256 maxSwapInAmount,
                     address[] memory path,
-                    bytes32 subAction
-                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], bytes32));
-                uniV2SwapExactIn(swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, subAction);
+                    bytes32 subAction,
+                    uint256 deadline
+                ) = abi.decode(action.data, (address, uint256, address, uint256, address[], bytes32, uint256));
+                uniV2SwapExactIn(swapOutAsset, swapOutAmount, swapInAsset, maxSwapInAmount, path, subAction, deadline);
             } else {
                 revert("invalid action");
             }
@@ -501,6 +518,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param path The path of the Uniswap v3 swap.
      * @param fee The fee of the Uniswap v3 swap.
      * @param subAction The sub-action for Iron Bank.
+     * @param deadline The deadline of the Uniswap v3 swap.
      */
     function uniV3SwapExactOut(
         address swapOutAsset,
@@ -509,8 +527,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         uint256 maxSwapInAmount,
         address[] memory path,
         uint24[] memory fee,
-        bytes32 subAction
-    ) internal nonReentrant {
+        bytes32 subAction,
+        uint256 deadline
+    ) internal nonReentrant checkDeadline(deadline) {
         require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
         if (swapOutAmount == type(uint256).max) {
             require(subAction == SUB_ACTION_CLOSE_SHORT_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
@@ -555,6 +574,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param path The path of the Uniswap v3 swap.
      * @param fee The fee of the Uniswap v3 swap.
      * @param subAction The sub-action for Iron Bank.
+     * @param deadline The deadline of the Uniswap v3 swap.
      */
     function uniV3SwapExactIn(
         address swapInAsset,
@@ -563,8 +583,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         uint256 minSwapOutAmount,
         address[] memory path,
         uint24[] memory fee,
-        bytes32 subAction
-    ) internal nonReentrant {
+        bytes32 subAction,
+        uint256 deadline
+    ) internal nonReentrant checkDeadline(deadline) {
         require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
         if (swapInAmount == type(uint256).max) {
             require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_COLLATERAL);
@@ -608,6 +629,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param maxSwapInAmount The maximum amount of the swap in asset.
      * @param path The path of the Uniswap v2 swap.
      * @param subAction The sub-action for Iron Bank.
+     * @param deadline The deadline of the Uniswap v2 swap.
      */
     function uniV2SwapExactOut(
         address swapOutAsset,
@@ -615,8 +637,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         address swapInAsset,
         uint256 maxSwapInAmount,
         address[] memory path,
-        bytes32 subAction
-    ) internal nonReentrant {
+        bytes32 subAction,
+        uint256 deadline
+    ) internal nonReentrant checkDeadline(deadline) {
         require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
         if (swapOutAmount == type(uint256).max) {
             require(subAction == SUB_ACTION_CLOSE_SHORT_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
@@ -653,6 +676,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param minSwapOutAmount The minimum amount of the swap out asset.
      * @param path The path of the Uniswap v2 swap.
      * @param subAction The sub-action for Iron Bank.
+     * @param deadline The deadline of the Uniswap v2 swap.
      */
     function uniV2SwapExactIn(
         address swapInAsset,
@@ -660,8 +684,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         address swapOutAsset,
         uint256 minSwapOutAmount,
         address[] memory path,
-        bytes32 subAction
-    ) internal nonReentrant {
+        bytes32 subAction,
+        uint256 deadline
+    ) internal nonReentrant checkDeadline(deadline) {
         require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
         if (swapInAmount == type(uint256).max) {
             require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_COLLATERAL);

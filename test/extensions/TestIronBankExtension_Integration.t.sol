@@ -228,11 +228,14 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
-            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
+            data: abi.encode(
+                WETH, longAmount, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions1);
 
@@ -244,7 +247,9 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
-            data: abi.encode(WETH, type(uint256).max, DAI, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+            data: abi.encode(
+                WETH, type(uint256).max, DAI, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions2);
 
@@ -273,11 +278,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
-            data: abi.encode(WETH, shortAmount, DAI, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+            data: abi.encode(WETH, shortAmount, DAI, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
@@ -290,7 +296,14 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
-                WETH, type(uint256).max, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
+                WETH,
+                type(uint256).max,
+                DAI,
+                type(uint256).max,
+                path,
+                fees,
+                bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"),
+                deadline
                 )
         });
         extension.execute(actions2);
@@ -320,12 +333,15 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] =
             IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
-            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
+            data: abi.encode(
+                DAI, longAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions1);
 
@@ -337,7 +353,9 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
-            data: abi.encode(DAI, type(uint256).max, USDT, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+            data: abi.encode(
+                DAI, type(uint256).max, USDT, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions2);
 
@@ -366,12 +384,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] =
             IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
-            data: abi.encode(DAI, shortAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+            data: abi.encode(DAI, shortAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
@@ -384,7 +403,14 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
-                DAI, type(uint256).max, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
+                DAI,
+                type(uint256).max,
+                USDT,
+                type(uint256).max,
+                path,
+                fees,
+                bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"),
+                deadline
                 )
         });
         extension.execute(actions2);
@@ -418,10 +444,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
-            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_SWAP_DEBT"))
+            data: abi.encode(
+                DAI, borrowAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_SWAP_DEBT"), deadline
+                )
         });
         extension.execute(actions);
 
@@ -451,10 +480,11 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint24[] memory fees = new uint24[](2);
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
-            data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_SWAP_COLLATERAL"))
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_SWAP_COLLATERAL"), deadline)
         });
         extension.execute(actions);
 
@@ -477,11 +507,14 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = WETH;
         path[1] = USDC;
         path[2] = DAI;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
-            data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
+            data: abi.encode(
+                WETH, longAmount, DAI, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions1);
 
@@ -493,7 +526,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
-            data: abi.encode(WETH, type(uint256).max, DAI, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+            data: abi.encode(WETH, type(uint256).max, DAI, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline)
         });
         extension.execute(actions2);
 
@@ -519,11 +552,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = WETH;
         path[1] = USDC;
         path[2] = DAI;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
-            data: abi.encode(WETH, shortAmount, DAI, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+            data: abi.encode(WETH, shortAmount, DAI, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
@@ -536,7 +570,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
-                WETH, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
+                WETH, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"), deadline
                 )
         });
         extension.execute(actions2);
@@ -563,12 +597,15 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] =
             IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
-            data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
+            data: abi.encode(
+                DAI, longAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
+                )
         });
         extension.execute(actions1);
 
@@ -580,7 +617,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
-            data: abi.encode(DAI, type(uint256).max, USDT, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+            data: abi.encode(DAI, type(uint256).max, USDT, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline)
         });
         extension.execute(actions2);
 
@@ -606,12 +643,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
         actions1[0] =
             IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
-            data: abi.encode(DAI, shortAmount, USDT, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+            data: abi.encode(DAI, shortAmount, USDT, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
@@ -624,7 +662,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
-                DAI, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
+                DAI, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"), deadline
                 )
         });
         extension.execute(actions2);
@@ -655,10 +693,11 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
-            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_SWAP_DEBT"))
+            data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_SWAP_DEBT"), deadline)
         });
         extension.execute(actions);
 
@@ -685,10 +724,11 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
+        uint256 deadline = block.timestamp + 1 hours;
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
         actions[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
-            data: abi.encode(DAI, supplyAmount, USDT, 0, path, bytes32("SUB_ACTION_SWAP_COLLATERAL"))
+            data: abi.encode(DAI, supplyAmount, USDT, 0, path, bytes32("SUB_ACTION_SWAP_COLLATERAL"), deadline)
         });
         extension.execute(actions);
 
