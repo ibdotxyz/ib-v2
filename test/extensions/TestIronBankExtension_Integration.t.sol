@@ -212,13 +212,14 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
     function testLongWethAgainstDaiThruUniV3() public {
         /**
-         * Long 100 WETH.
+         * Long 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
         uint256 longAmount = 100e18;
 
         vm.startPrank(user1);
-        IERC20(WETH).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 100000e18;
+        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
@@ -228,91 +229,89 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == longAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
 
-        path[0] = DAI;
-        path[1] = USDC;
-        path[2] = WETH;
-        fees[0] = 100; // 0.01%
-        fees[1] = 500; // 0.05%
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
-            data: abi.encode(
-                DAI, type(uint256).max, WETH, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
-                )
+            name: "ACTION_UNISWAP_V3_EXACT_INPUT",
+            data: abi.encode(WETH, type(uint256).max, DAI, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
         });
         extension.execute(actions2);
 
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > 0);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
         vm.stopPrank();
     }
 
-    function testLongUsdtAgainstWethThruUniV3() public {
+    function testShortWethAgainstDaiThruUniV3() public {
         /**
-         * Long 100,000 USDT.
-         * Path: USDT -> WETH
+         * Short 100 WETH with additional 100,000 DAI collateral.
+         * Path: WETH -> USDC -> DAI
          */
-        uint256 longAmount = 100000e6;
+        uint256 shortAmount = 100e18;
 
         vm.startPrank(user1);
-        IERC20(USDT).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 100000e18;
+        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
 
-        address[] memory path = new address[](2);
-        path[0] = USDT;
-        path[1] = WETH;
-        uint24[] memory fees = new uint24[](1);
-        fees[0] = 3000; // 0.3%
+        address[] memory path = new address[](3);
+        path[0] = WETH;
+        path[1] = USDC;
+        path[2] = DAI;
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 500; // 0.05%
+        fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
-            data: abi.encode(
-                USDT, longAmount, WETH, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION")
-                )
+            name: "ACTION_UNISWAP_V3_EXACT_INPUT",
+            data: abi.encode(WETH, shortAmount, DAI, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == shortAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
 
-        path[0] = WETH;
-        path[1] = USDT;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
-                WETH, type(uint256).max, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                WETH, type(uint256).max, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
                 )
         });
         extension.execute(actions2);
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > 0);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
         vm.stopPrank();
     }
 
     function testLongDaiAgainstUsdtThruUniV3() public {
         /**
-         * Long 100,000 DAI.
+         * Long 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
         uint256 longAmount = 100000e18;
 
         vm.startPrank(user1);
-        IERC20(DAI).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 50000e6;
+        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
@@ -322,31 +321,78 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
+        actions1[0] =
+            IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == longAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
 
-        path[0] = USDT;
+        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
+        actions2[0] = IronBankExtension.Action({
+            name: "ACTION_UNISWAP_V3_EXACT_INPUT",
+            data: abi.encode(DAI, type(uint256).max, USDT, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+        });
+        extension.execute(actions2);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
+        vm.stopPrank();
+    }
+
+    function testShortDaiAgainstUsdtThruUniV3() public {
+        /**
+         * Short 100,000 DAI with additional 50,000 USDT collateral.
+         * Path: DAI -> USDC -> USDT
+         */
+        uint256 shortAmount = 100000e18;
+
+        vm.startPrank(user1);
+        uint256 collateralAmount = 50000e6;
+        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
         path[1] = USDC;
-        path[2] = DAI;
+        path[2] = USDT;
+        uint24[] memory fees = new uint24[](2);
+        fees[0] = 100; // 0.01%
+        fees[1] = 100; // 0.01%
+        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
+        actions1[0] =
+            IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
+        actions1[1] = IronBankExtension.Action({
+            name: "ACTION_UNISWAP_V3_EXACT_INPUT",
+            data: abi.encode(DAI, shortAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+        });
+        extension.execute(actions1);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == shortAmount);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
+
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
-                USDT, type(uint256).max, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                DAI, type(uint256).max, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
                 )
         });
         extension.execute(actions2);
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
         vm.stopPrank();
     }
 
@@ -418,131 +464,175 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
     function testLongWethAgainstDaiThruUniV2() public {
         /**
-         * Long 100 WETH.
+         * Long 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
         uint256 longAmount = 100e18;
 
         vm.startPrank(user1);
-        IERC20(WETH).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 100000e18;
+        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
         path[1] = USDC;
         path[2] = DAI;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(WETH, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(WETH, longAmount, DAI, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == longAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
 
-        path[0] = DAI;
-        path[1] = USDC;
-        path[2] = WETH;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
-            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
-            data: abi.encode(
-                DAI, type(uint256).max, WETH, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
-                )
+            name: "ACTION_UNISWAP_V2_EXACT_INPUT",
+            data: abi.encode(WETH, type(uint256).max, DAI, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
         });
         extension.execute(actions2);
 
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > 0);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
         vm.stopPrank();
     }
 
-    function testLongUsdtAgainstWethThruUniV2() public {
+    function testShortWethAgainstDaiThruUniV2() public {
         /**
-         * Long 100,000 USDT.
-         * Path: USDT -> WETH
+         * Short 100 WETH with additional 100,000 DAI collateral.
+         * Path: WETH -> USDC -> DAI
          */
-        uint256 longAmount = 100000e6;
+        uint256 shortAmount = 100e18;
 
         vm.startPrank(user1);
-        IERC20(USDT).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 100000e18;
+        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
 
-        address[] memory path = new address[](2);
-        path[0] = USDT;
-        path[1] = WETH;
+        address[] memory path = new address[](3);
+        path[0] = WETH;
+        path[1] = USDC;
+        path[2] = DAI;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, longAmount)});
+        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
-            name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
-            data: abi.encode(USDT, longAmount, WETH, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
+            name: "ACTION_UNISWAP_V2_EXACT_INPUT",
+            data: abi.encode(WETH, shortAmount, DAI, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == shortAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
 
-        path[0] = WETH;
-        path[1] = USDT;
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
-                WETH, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                WETH, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
                 )
         });
         extension.execute(actions2);
 
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+        assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > 0);
+        assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
         vm.stopPrank();
     }
 
     function testLongDaiAgainstUsdtThruUniV2() public {
         /**
-         * Long 100,000 DAI.
+         * Long 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
         uint256 longAmount = 100000e18;
 
         vm.startPrank(user1);
-        IERC20(DAI).safeIncreaseAllowance(address(extension), longAmount);
+        uint256 collateralAmount = 50000e6;
+        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
         IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, longAmount)});
+        actions1[0] =
+            IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
         actions1[1] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(DAI, longAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"))
         });
         extension.execute(actions1);
 
-        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue > 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == longAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
 
-        path[0] = USDT;
+        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
+        actions2[0] = IronBankExtension.Action({
+            name: "ACTION_UNISWAP_V2_EXACT_INPUT",
+            data: abi.encode(DAI, type(uint256).max, USDT, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"))
+        });
+        extension.execute(actions2);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
+        vm.stopPrank();
+    }
+
+    function testShortDaiAgainstUsdtThruUniV2() public {
+        /**
+         * Short 100,000 DAI with additional 50,000 USDT collateral.
+         * Path: DAI -> USDC -> USDT
+         */
+        uint256 shortAmount = 100000e18;
+
+        vm.startPrank(user1);
+        uint256 collateralAmount = 50000e6;
+        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+
+        address[] memory path = new address[](3);
+        path[0] = DAI;
         path[1] = USDC;
-        path[2] = DAI;
+        path[2] = USDT;
+        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
+        actions1[0] =
+            IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(USDT, collateralAmount)});
+        actions1[1] = IronBankExtension.Action({
+            name: "ACTION_UNISWAP_V2_EXACT_INPUT",
+            data: abi.encode(DAI, shortAmount, USDT, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"))
+        });
+        extension.execute(actions1);
+
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > collateralAmount);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == shortAmount);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
+
         IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
         actions2[0] = IronBankExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
-                USDT, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION")
+                DAI, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION")
                 )
         });
         extension.execute(actions2);
 
-        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
-        assertTrue(collateralValue > 0);
-        assertTrue(debtValue == 0);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > 0);
+        assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
+        assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
         vm.stopPrank();
     }
 

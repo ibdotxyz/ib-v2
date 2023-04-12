@@ -63,6 +63,12 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     /// @notice The sub-action for close long position
     bytes32 public constant SUB_ACTION_CLOSE_LONG_POSITION = "SUB_ACTION_CLOSE_LONG_POSITION";
 
+    /// @notice The sub-action for open short position
+    bytes32 public constant SUB_ACTION_OPEN_SHORT_POSITION = "SUB_ACTION_OPEN_SHORT_POSITION";
+
+    /// @notice The sub-action for close short position
+    bytes32 public constant SUB_ACTION_CLOSE_SHORT_POSITION = "SUB_ACTION_CLOSE_SHORT_POSITION";
+
     /// @notice The sub-action for swap debt
     bytes32 public constant SUB_ACTION_SWAP_DEBT = "SUB_ACTION_SWAP_DEBT";
 
@@ -218,17 +224,23 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 uniV3AmountOutCached = amountReceived;
 
-                if (data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
                     ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
+                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
             }
 
             if (tokenIn == data.swapInAsset) {
-                if (data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
+                if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION) {
+                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                } else if (
+                    data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL
+                ) {
                     ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
@@ -244,7 +256,8 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
                     ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
-                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
+                } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
+                {
                     ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
@@ -264,7 +277,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
                     ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
-                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
+                } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION) {
                     ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
@@ -319,17 +332,23 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 uniV2AmountOutCached = amountReceived;
 
-                if (data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
+                if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
                     ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
+                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
             }
 
             if (tokenIn == data.swapInAsset) {
-                if (data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
+                if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION) {
+                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                } else if (
+                    data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL
+                ) {
                     ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
@@ -344,7 +363,8 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
                     ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
-                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
+                } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
+                {
                     ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
@@ -363,7 +383,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
                     ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
-                } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
+                } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION) {
                     ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
@@ -493,7 +513,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     ) internal nonReentrant {
         require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
         if (swapOutAmount == type(uint256).max) {
-            require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
+            require(subAction == SUB_ACTION_CLOSE_SHORT_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
             ironBank.accrueInterest(swapOutAsset);
             swapOutAmount = ironBank.getBorrowBalance(msg.sender, swapOutAsset);
         }
@@ -547,8 +567,8 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     ) internal nonReentrant {
         require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
         if (swapInAmount == type(uint256).max) {
-            require(subAction == SUB_ACTION_SWAP_COLLATERAL);
-            ironBank.accrueInterest(swapOutAsset);
+            require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_COLLATERAL);
+            ironBank.accrueInterest(swapInAsset);
             swapInAmount = ironBank.getSupplyBalance(msg.sender, swapInAsset);
         }
         require(swapInAmount > 0, "invalid swap in amount");
@@ -599,7 +619,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     ) internal nonReentrant {
         require(swapOutAsset != swapInAsset, "invalid swap out or in asset");
         if (swapOutAmount == type(uint256).max) {
-            require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
+            require(subAction == SUB_ACTION_CLOSE_SHORT_POSITION || subAction == SUB_ACTION_SWAP_DEBT);
             ironBank.accrueInterest(swapOutAsset);
             swapOutAmount = ironBank.getBorrowBalance(msg.sender, swapOutAsset);
         }
@@ -644,8 +664,8 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     ) internal nonReentrant {
         require(swapInAsset != swapOutAsset, "invalid swap in or out asset");
         if (swapInAmount == type(uint256).max) {
-            require(subAction == SUB_ACTION_SWAP_COLLATERAL);
-            ironBank.accrueInterest(swapOutAsset);
+            require(subAction == SUB_ACTION_CLOSE_LONG_POSITION || subAction == SUB_ACTION_SWAP_COLLATERAL);
+            ironBank.accrueInterest(swapInAsset);
             swapInAmount = ironBank.getSupplyBalance(msg.sender, swapInAsset);
         }
         require(swapInAmount > 0, "invalid swap in amount");
