@@ -63,9 +63,9 @@ contract IronBank is
         return _getExchangeRate(m);
     }
 
-    function getMarketStatus(address market) public view returns (uint256, uint256, uint256, uint256, uint256) {
+    function getMarketStatus(address market) public view returns (uint256, uint256, uint256, uint256) {
         Market storage m = markets[market];
-        return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalCollateral, m.totalReserves);
+        return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalReserves);
     }
 
     function isMarketListed(address market) public view returns (bool) {
@@ -88,17 +88,6 @@ contract IronBank is
         return 0;
     }
 
-    function getMaxCollateralizeAmount(address market) public view returns (uint256) {
-        Market storage m = markets[market];
-        if (m.config.collateralCap == 0) {
-            return type(uint256).max;
-        }
-        if (m.config.collateralCap > m.totalCollateral) {
-            return m.config.collateralCap - m.totalCollateral;
-        }
-        return 0;
-    }
-
     function getBorrowBalance(address user, address market) public view returns (uint256) {
         Market storage m = markets[market];
 
@@ -107,12 +96,7 @@ contract IronBank is
 
     function getSupplyBalance(address user, address market) public view returns (uint256) {
         Market storage m = markets[market];
-        uint256 ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
-        return (ibTokenAmount * _getExchangeRate(m)) / 1e18;
-    }
-
-    function getUserCollateralBalance(address user, address market) public view returns (uint256) {
-        return markets[market].userCollaterals[user];
+        return (markets[market].userSupplies[user] * _getExchangeRate(m)) / 1e18;
     }
 
     function getAccountLiquidity(address user) public view returns (uint256, uint256) {
@@ -163,45 +147,6 @@ contract IronBank is
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function enterMarket(address user, address market) external nonReentrant isAuthorized(user) {
-        Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-
-        _enterMarket(market, user);
-
-        uint256 gap = IERC20(m.config.ibTokenAddress).balanceOf(user) - m.userCollaterals[user];
-        if (gap > 0) {
-            _increaseCollateral(market, m, user, gap);
-        }
-    }
-
-    function exitMarket(address user, address market) external nonReentrant isAuthorized(user) {
-        Market storage m = markets[market];
-        UserBorrow storage b = m.userBorrows[user];
-        require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-        require(b.borrowBalance == 0, "borrow balance not zero");
-
-        if (!isEnteredMarket(user, market)) {
-            // Skip if the market is not entered.
-            return;
-        }
-
-        delete enteredMarkets[user][market];
-        allEnteredMarkets[user].deleteElement(market);
-
-        if (m.userCollaterals[user] > 0) {
-            _decreaseCollateral(market, m, user, m.userCollaterals[user]);
-
-            if (m.config.collateralFactor > 0) {
-                _checkAccountLiquidity(user);
-            }
-        }
-
-        emit MarketExited(market, user);
-    }
-
     function accrueInterest(address market) external nonReentrant {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
@@ -229,13 +174,15 @@ contract IronBank is
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
 
-        // Update storage.
+        // Update total cash and total supply in pool.
         m.totalCash += amount;
         m.totalSupply += ibTokenAmount;
 
-        if (isEnteredMarket(user, market)) {
-            // Increase user and total collateral.
-            _increaseCollateral(market, m, user, ibTokenAmount);
+        // Update user supply balance.
+        m.userSupplies[user] += ibTokenAmount;
+
+        if (m.userSupplies[user] > 0) {
+            _enterMarket(market, user);
         }
 
         IBTokenInterface(m.config.ibTokenAddress).mint(user, ibTokenAmount);
@@ -256,7 +203,6 @@ contract IronBank is
         }
 
         _accrueInterest(market, m);
-        _enterMarket(market, user);
 
         uint256 newUserBorrowBalance = _getBorrowBalance(m, user) + amount;
 
@@ -267,6 +213,10 @@ contract IronBank is
         // Update user borrow status.
         m.userBorrows[user].borrowBalance = newUserBorrowBalance;
         m.userBorrows[user].borrowIndex = m.borrowIndex;
+
+        if (newUserBorrowBalance > 0) {
+            _enterMarket(market, user);
+        }
 
         IERC20(market).safeTransfer(msg.sender, amount);
 
@@ -289,7 +239,7 @@ contract IronBank is
 
         uint256 ibTokenAmount;
         if (amount == type(uint256).max) {
-            ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
+            ibTokenAmount = m.userSupplies[user];
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
@@ -297,14 +247,15 @@ contract IronBank is
 
         require(m.totalCash >= amount, "insufficient cash");
 
-        // Update storage.
+        // Update internal cash and total supply in pool.
         m.totalCash -= amount;
         m.totalSupply -= ibTokenAmount;
 
-        if (isEnteredMarket(user, market)) {
-            // Decrease user and total collateral.
-            uint256 collateralAmount = _getCollateralToken(m, user, ibTokenAmount);
-            _decreaseCollateral(market, m, user, collateralAmount);
+        // Update user supply balance.
+        m.userSupplies[user] -= ibTokenAmount;
+
+        if (m.userSupplies[user] == 0 && _getBorrowBalance(m, user) == 0) {
+            _exitMarket(market, user);
         }
 
         IBTokenInterface(m.config.ibTokenAddress).burn(user, ibTokenAmount);
@@ -340,6 +291,10 @@ contract IronBank is
         m.userBorrows[user].borrowBalance = newUserBorrowBalance;
         m.userBorrows[user].borrowIndex = m.borrowIndex;
 
+        if (m.userSupplies[user] == 0 && newUserBorrowBalance == 0) {
+            _exitMarket(market, user);
+        }
+
         IERC20(market).safeTransferFrom(msg.sender, address(this), amount);
 
         emit Repay(market, user, amount, newUserBorrowBalance, m.totalBorrow);
@@ -360,8 +315,6 @@ contract IronBank is
         require(!mCollateral.config.isFrozen, "collateral market frozen");
         require(!isCreditAccount(violator), "cannot liquidate credit account");
         require(liquidator != violator, "cannot self liquidate");
-        require(isEnteredMarket(violator, marketBorrow), "borrow market not entered");
-        require(isEnteredMarket(violator, marketCollateral), "collateral market not entered");
 
         _accrueInterest(marketBorrow, mBorrow);
         _accrueInterest(marketCollateral, mCollateral);
@@ -375,7 +328,7 @@ contract IronBank is
 
         // Transfer collateral.
         uint256 ibTokenAmount = _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
-        _transferIBToken(mCollateral, violator, liquidator, ibTokenAmount);
+        _transferIBToken(marketCollateral, mCollateral, violator, liquidator, ibTokenAmount);
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(violator, liquidator, ibTokenAmount);
 
         _checkAccountLiquidity(liquidator);
@@ -395,6 +348,26 @@ contract IronBank is
 
         if (status == LIQUIDITY_CHECK_DIRTY) {
             _checkAccountLiquidity(user);
+        }
+    }
+
+    function addToReserves(address market) external nonReentrant {
+        Market storage m = markets[market];
+        require(m.config.isListed, "not listed");
+        require(!m.config.isFrozen, "frozen");
+
+        _accrueInterest(market, m);
+
+        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
+
+        if (amount > 0) {
+            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
+
+            // Update total reserves and internal cash.
+            m.totalReserves += ibTokenAmount;
+            m.totalCash += amount;
+
+            emit ReservesIncreased(market, ibTokenAmount, amount);
         }
     }
 
@@ -427,29 +400,9 @@ contract IronBank is
         require(!isCreditAccount(to), "cannot transfer to credit account");
 
         _accrueInterest(market, m);
-        _transferIBToken(m, from, to, amount);
+        _transferIBToken(market, m, from, to, amount);
 
         _checkAccountLiquidity(from);
-    }
-
-    function addToReserves(address market) external nonReentrant {
-        Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-
-        _accrueInterest(market, m);
-
-        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
-
-        if (amount > 0) {
-            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
-
-            // Update total reserves and internal cash.
-            m.totalReserves += ibTokenAmount;
-            m.totalCash += amount;
-
-            emit ReservesIncreased(market, ibTokenAmount, amount);
-        }
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -621,57 +574,31 @@ contract IronBank is
         return (b.borrowBalance * m.borrowIndex) / b.borrowIndex;
     }
 
-    function _increaseCollateral(address market, Market storage m, address user, uint256 amount) internal {
-        if (
-            m.config.collateralCap == 0
-                || (m.config.collateralCap != 0 && m.totalCollateral + amount <= m.config.collateralCap)
-        ) {
-            m.totalCollateral += amount;
-            m.userCollaterals[user] += amount;
-
-            emit UserCollateralChanged(market, user, amount);
-        } else if (m.totalCollateral < m.config.collateralCap) {
-            uint256 gap = m.config.collateralCap - m.totalCollateral;
-            m.totalCollateral += gap;
-            m.userCollaterals[user] += gap;
-
-            emit UserCollateralChanged(market, user, gap);
-        }
-    }
-
-    function _decreaseCollateral(address market, Market storage m, address user, uint256 amount) internal {
-        if (amount > 0) {
-            m.totalCollateral -= amount;
-            m.userCollaterals[user] -= amount;
-
-            emit UserCollateralChanged(market, user, amount);
-        }
-    }
-
-    function _getCollateralToken(Market storage m, address user, uint256 amount) internal view returns (uint256) {
-        uint256 ibTokenAmount = IERC20(m.config.ibTokenAddress).balanceOf(user);
-        uint256 gap = ibTokenAmount - m.userCollaterals[user];
-        if (amount > gap) {
-            return amount - gap;
-        } else {
-            return 0;
-        }
-    }
-
     function _transferDebt(address market, Market storage m, address from, address to, uint256 amount) internal {
-        _enterMarket(market, to);
+        if (amount > 0) {
+            _enterMarket(market, to);
 
-        m.userBorrows[from].borrowBalance -= amount;
-        m.userBorrows[from].borrowIndex = m.borrowIndex;
-        m.userBorrows[to].borrowBalance += amount;
-        m.userBorrows[to].borrowIndex = m.borrowIndex;
+            m.userBorrows[from].borrowBalance -= amount;
+            m.userBorrows[from].borrowIndex = m.borrowIndex;
+            m.userBorrows[to].borrowBalance += amount;
+            m.userBorrows[to].borrowIndex = m.borrowIndex;
+
+            if (m.userBorrows[from].borrowBalance == 0 && m.userSupplies[from] == 0) {
+                _exitMarket(market, from);
+            }
+        }
     }
 
-    function _transferIBToken(Market storage m, address from, address to, uint256 amount) internal {
-        if (m.userCollaterals[from] > 0) {
-            uint256 collateralAmount = _getCollateralToken(m, from, amount);
-            m.userCollaterals[from] -= collateralAmount;
-            m.userCollaterals[to] += collateralAmount;
+    function _transferIBToken(address market, Market storage m, address from, address to, uint256 amount) internal {
+        if (amount > 0) {
+            _enterMarket(market, to);
+
+            m.userSupplies[from] -= amount;
+            m.userSupplies[to] += amount;
+
+            if (_getBorrowBalance(m, from) == 0 && m.userSupplies[from] == 0) {
+                _exitMarket(market, from);
+            }
         }
     }
 
@@ -717,6 +644,18 @@ contract IronBank is
         emit MarketEntered(market, user);
     }
 
+    function _exitMarket(address market, address user) internal {
+        if (!enteredMarkets[user][market]) {
+            // Skip if user has not entered the market.
+            return;
+        }
+
+        enteredMarkets[user][market] = false;
+        allEnteredMarkets[user].deleteElement(market);
+
+        emit MarketExited(market, user);
+    }
+
     function _checkAccountLiquidity(address user) internal {
         uint8 status = liquidityCheckStatus[user];
 
@@ -739,19 +678,14 @@ contract IronBank is
                 continue;
             }
 
-            uint256 collateralBalance = m.userCollaterals[user];
+            uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
-            if (collateralBalance == 0 && borrowBalance == 0) {
-                // Skip if user has no supply or borrow balance on this asset.
-                continue;
-            }
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
             uint256 collateralFactor = uint256(m.config.collateralFactor);
-            if (collateralBalance > 0 && collateralFactor > 0) {
+            if (supplyBalance > 0 && collateralFactor > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
-                collateralValue +=
-                    (collateralBalance * exchangeRate * assetPrice * collateralFactor) / 1e36 / FACTOR_SCALE;
+                collateralValue += (supplyBalance * exchangeRate * assetPrice * collateralFactor) / 1e36 / FACTOR_SCALE;
             }
             if (borrowBalance > 0) {
                 debtValue += (borrowBalance * assetPrice) / 1e18;

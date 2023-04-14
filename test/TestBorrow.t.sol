@@ -71,12 +71,13 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.enterMarket(user1, address(market1));
         ib.borrow(user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertTrue(ib.isEnteredMarket(user1, address(market2)));
 
         address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(userEnteredMarkets.length, 2);
@@ -105,12 +106,18 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.enterMarket(user1, address(market1));
         ib.borrow(user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertTrue(ib.isEnteredMarket(user1, address(market2)));
+
+        address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
+        assertEq(userEnteredMarkets.length, 2);
+        assertEq(userEnteredMarkets[0], address(market1));
+        assertEq(userEnteredMarkets[1], address(market2));
 
         fastForwardTime(86400);
         ib.accrueInterest(address(market2));
@@ -258,7 +265,6 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.enterMarket(user1, address(market1));
         vm.expectRevert("insufficient collateral");
         ib.borrow(user1, address(market2), market2BorrowAmount);
         vm.stopPrank();

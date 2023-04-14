@@ -7,10 +7,6 @@ import "../protocol/pool/IronBankStorage.sol";
 interface IronBankInterface {
     /* ========== USER INTERFACES ========== */
 
-    function enterMarket(address user, address market) external;
-
-    function exitMarket(address user, address market) external;
-
     function accrueInterest(address market) external;
 
     function supply(address user, address market, uint256 amount) external;
@@ -30,8 +26,6 @@ interface IronBankInterface {
     function isMarketListed(address market) external view returns (bool);
 
     function getMaxBorrowAmount(address market) external view returns (uint256);
-
-    function getMaxCollateralizeAmount(address market) external view returns (uint256);
 
     /* ========== TOKEN HOOK INTERFACES ========== */
 

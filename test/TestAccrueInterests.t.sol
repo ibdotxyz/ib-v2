@@ -76,11 +76,10 @@ contract AccrueInterestTest is Test, Common {
         vm.startPrank(user1);
         market2.approve(address(ib), market2SupplyAmount);
         ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.enterMarket(user1, address(market2));
         ib.borrow(user1, address(market1), market1BorrowAmount);
         vm.stopPrank();
 
-        (, uint256 totalBorrow, uint256 totalSupply,, uint256 totalReserves) = ib.getMarketStatus(address(market1));
+        (, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market1));
 
         fastForwardTime(86400);
 
@@ -95,7 +94,7 @@ contract AccrueInterestTest is Test, Common {
          * new total reserves = 500.004146890436287687 - 500 = 0.004146890436287687
          */
         ib.accrueInterest(address(market1));
-        (, uint256 newTotalBorrow, uint256 newTotalSupply,, uint256 newTotalReserves) =
+        (, uint256 newTotalBorrow, uint256 newTotalSupply, uint256 newTotalReserves) =
             ib.getMarketStatus(address(market1));
         assertEq(newTotalBorrow - totalBorrow, 0.041472e18);
         assertEq(newTotalSupply - totalSupply, 0.004146890436287687e18);
@@ -103,7 +102,7 @@ contract AccrueInterestTest is Test, Common {
 
         // Accrue interests again. Nothing will change.
         ib.accrueInterest(address(market1));
-        (, uint256 newTotalBorrow2, uint256 newTotalSupply2,, uint256 newTotalReserves2) =
+        (, uint256 newTotalBorrow2, uint256 newTotalSupply2, uint256 newTotalReserves2) =
             ib.getMarketStatus(address(market1));
         assertEq(newTotalBorrow, newTotalBorrow2);
         assertEq(newTotalSupply, newTotalSupply2);
@@ -118,12 +117,12 @@ contract AccrueInterestTest is Test, Common {
         ib.supply(admin, address(market1), supplyAmount);
         vm.stopPrank();
 
-        (, uint256 totalBorrow, uint256 totalSupply,, uint256 totalReserves) = ib.getMarketStatus(address(market1));
+        (, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market1));
 
         fastForwardTime(86400);
 
         ib.accrueInterest(address(market1));
-        (, uint256 newTotalBorrow, uint256 newTotalSupply,, uint256 newTotalReserves) =
+        (, uint256 newTotalBorrow, uint256 newTotalSupply, uint256 newTotalReserves) =
             ib.getMarketStatus(address(market1));
 
         assertEq(newTotalBorrow, totalBorrow);

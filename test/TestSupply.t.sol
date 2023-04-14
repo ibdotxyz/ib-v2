@@ -55,6 +55,8 @@ contract SupplyTest is Test, Common {
         // Accrue no interest without borrows.
         ib.accrueInterest(address(market));
         assertEq(ibToken.balanceOf(user1), 100e18);
+        assertEq(ib.getSupplyBalance(user1, address(market)), 100e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market)));
     }
 
     function testSupplyMultiple() public {
@@ -76,22 +78,14 @@ contract SupplyTest is Test, Common {
         vm.stopPrank();
 
         assertEq(ibToken.balanceOf(user1), 200e18);
+        assertEq(ib.getSupplyBalance(user1, address(market)), 200e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market)));
         assertEq(ibToken.balanceOf(user2), 200e18);
+        assertEq(ib.getSupplyBalance(user2, address(market)), 200e18);
+        assertTrue(ib.isEnteredMarket(user2, address(market)));
         assertEq(ibToken.totalSupply(), 400e18);
-    }
-
-    function testSupplyAndIncreaseCollateral() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
-
-        vm.startPrank(user1);
-        market.approve(address(ib), supplyAmount);
-
-        ib.enterMarket(user1, address(market));
-
-        ib.supply(user1, address(market), supplyAmount);
-
-        assertEq(ibToken.balanceOf(user1), 100e18);
-        assertEq(ib.getUserCollateralBalance(user1, address(market)), 100e18);
+        (,, uint256 totalSupply,) = ib.getMarketStatus(address(market));
+        assertEq(totalSupply, 400e18);
     }
 
     function testCannotSupplyForInsufficientAllowance() public {

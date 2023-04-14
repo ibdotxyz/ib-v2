@@ -69,6 +69,8 @@ contract RedeemTest is Test, Common {
         vm.stopPrank();
 
         assertEq(ibToken1.balanceOf(user1), 50e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50e18);
         assertEq(market1.balanceOf(user1), 9950e18);
     }
@@ -85,7 +87,6 @@ contract RedeemTest is Test, Common {
         vm.startPrank(admin);
         market2.approve(address(ib), 10000e18);
         ib.supply(admin, address(market2), 10000e18);
-        ib.enterMarket(admin, address(market2));
         ib.borrow(admin, address(market1), 30e18);
         vm.stopPrank();
 
@@ -106,6 +107,8 @@ contract RedeemTest is Test, Common {
          * user remaining ibToken amount = 100 - 50 / 1.0000303264 = 50.001516274016867655
          */
         assertEq(ibToken1.balanceOf(user1), 50.001516274016867655e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 50.00303264e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50.001516274016867655e18);
         assertEq(market1.balanceOf(user1), 9950e18);
 
@@ -121,43 +124,10 @@ contract RedeemTest is Test, Common {
         ib.redeem(user1, address(market1), type(uint256).max);
 
         assertEq(ibToken1.balanceOf(user1), 0);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 0);
+        assertFalse(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 0);
         assertGt(market1.balanceOf(user1), 10000e18);
-    }
-
-    function testRedeemAndDecreaseCollateral() public {
-        uint256 collateralCap = 80e18;
-        uint256 supplyAmount = 100e18;
-        uint256 redeemAmount = 50e18;
-
-        vm.prank(admin);
-        configurator.setMarketCollateralCaps(constructMarketCapArgument(address(market1), collateralCap));
-
-        vm.startPrank(user1);
-        market1.approve(address(ib), supplyAmount);
-        ib.enterMarket(user1, address(market1));
-        ib.supply(user1, address(market1), supplyAmount);
-
-        assertEq(ibToken1.balanceOf(user1), 100e18);
-        assertEq(ibToken1.totalSupply(), 100e18);
-        assertEq(ib.getUserCollateralBalance(user1, address(market1)), 80e18);
-        assertEq(market1.balanceOf(user1), 9900e18);
-
-        ib.redeem(user1, address(market1), redeemAmount);
-
-        assertEq(ibToken1.balanceOf(user1), 50e18);
-        assertEq(ibToken1.totalSupply(), 50e18);
-        assertEq(ib.getUserCollateralBalance(user1, address(market1)), 50e18); // non-collateral first
-        assertEq(market1.balanceOf(user1), 9950e18);
-
-        ib.redeem(user1, address(market1), type(uint256).max);
-
-        assertEq(ibToken1.balanceOf(user1), 0);
-        assertEq(ibToken1.totalSupply(), 0);
-        assertEq(ib.getUserCollateralBalance(user1, address(market1)), 0);
-        assertEq(market1.balanceOf(user1), 10000e18);
-
-        vm.stopPrank();
     }
 
     function testCannotRedeemForUnauthorized() public {
@@ -212,7 +182,6 @@ contract RedeemTest is Test, Common {
         vm.startPrank(admin);
         market2.approve(address(ib), 10000e18);
         ib.supply(admin, address(market2), 10000e18);
-        ib.enterMarket(admin, address(market2));
         ib.borrow(admin, address(market1), 50e18);
         vm.stopPrank();
 
@@ -232,7 +201,6 @@ contract RedeemTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.enterMarket(user1, address(market1));
         ib.supply(user1, address(market1), supplyAmount);
         ib.borrow(user1, address(market2), 100e18);
         vm.stopPrank();

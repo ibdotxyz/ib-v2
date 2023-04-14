@@ -23,13 +23,11 @@ contract IronBankLens is Constants {
         address interestRateModelAddress;
         // market security parameter
         uint256 supplyCap;
-        uint256 collateralCap;
         uint256 borrowCap;
         // market current status
         uint256 totalCash;
         uint256 totalBorrow;
         uint256 totalSupply;
-        uint256 totalCollateral;
         uint256 totalReserves;
         uint256 maxBorrowAmount;
         uint256 marketPrice;
@@ -49,7 +47,6 @@ contract IronBankLens is Constants {
             uint256 totalCash,
             uint256 totalBorrow,
             uint256 totalSupply,
-            uint256 totalCollateral,
             uint256 totalReserves,
         ) = ironBank.markets(market);
 
@@ -70,12 +67,10 @@ contract IronBankLens is Constants {
             debtTokenAddress: config.debtTokenAddress,
             interestRateModelAddress: config.interestRateModelAddress,
             supplyCap: config.supplyCap,
-            collateralCap: config.collateralCap,
             borrowCap: config.borrowCap,
             totalCash: totalCash,
             totalBorrow: totalBorrow,
             totalSupply: totalSupply,
-            totalCollateral: totalCollateral,
             totalReserves: totalReserves,
             maxBorrowAmount: ironBank.getMaxBorrowAmount(market),
             marketPrice: oracle.getPrice(market),
@@ -127,7 +122,6 @@ contract IronBankLens is Constants {
         address market;
         uint256 exchangeRate;
         uint256 supplyBalance;
-        uint256 collateralBalance;
         uint256 borrowBalance;
         bool isEnteredMarket;
     }
@@ -145,7 +139,6 @@ contract IronBankLens is Constants {
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
             supplyBalance: ibToken.balanceOf(user),
-            collateralBalance: ironBank.getUserCollateralBalance(user, market),
             borrowBalance: borrowBalance,
             isEnteredMarket: isEnteredMarket
         });
@@ -165,7 +158,6 @@ contract IronBankLens is Constants {
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
             supplyBalance: ibToken.balanceOf(user),
-            collateralBalance: ironBank.getUserCollateralBalance(user, market),
             borrowBalance: borrowBalance,
             isEnteredMarket: isEnteredMarket
         });

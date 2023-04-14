@@ -43,8 +43,6 @@ contract IronBankStorage is Constants {
         address liquidator, address violator, address marketBorrow, address marketCollateral, uint256 repayAmount
     );
 
-    event UserCollateralChanged(address indexed market, address indexed user, uint256 indexed amount);
-
     event TokenSeized(address token, address recipient, uint256 amount);
 
     event ReservesIncreased(address market, uint256 ibTokenAmount, uint256 amount);
@@ -67,12 +65,11 @@ contract IronBankStorage is Constants {
         bool supplyPaused;
         bool borrowPaused;
         bool isFrozen;
-        // 20 + 20 + 20 + 32 + 32 + 32 + 32
+        // 20 + 20 + 20 + 32 + 32 + 32
         address ibTokenAddress;
         address debtTokenAddress;
         address interestRateModelAddress;
         uint256 supplyCap;
-        uint256 collateralCap;
         uint256 borrowCap;
         uint256 initialExchangeRate;
     }
@@ -83,11 +80,10 @@ contract IronBankStorage is Constants {
         uint256 totalCash;
         uint256 totalBorrow;
         uint256 totalSupply;
-        uint256 totalCollateral;
         uint256 totalReserves;
         uint256 borrowIndex;
         mapping(address => UserBorrow) userBorrows;
-        mapping(address => uint256) userCollaterals;
+        mapping(address => uint256) userSupplies;
     }
 
     mapping(address => Market) public markets;
