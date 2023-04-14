@@ -2,61 +2,20 @@
 
 Iron Bank extension is an external contract that provides multiple useful operations for user to manager their positions. It integrates Uniswap v2 and Uniswap v3. It also allows users to combine multiple operations into one transaction. The provided operations include:
 
-### Supply Native Token
-
-Help user wrap Ether into WETH and supply it into Iron Bank.
-
-### Borrow Native Token
-
-Help user borrow WETH from Iron Bank and unwrap it to Ether.
-
-### Redeem Native Token
-
-Help user redeem WETH from Iron Bank and unwrap it to Ether.
-
-### Repay Native Token
-
-Help user wrap Ether into WETH and repay it into Iron Bank. If user repays more than borrow balance, the excessive amount will return to user.
-
-### Add collateral
-
-Help user supply asset and enter market. Need to be careful for the collateral cap.
-
-### Borrow
-
-Help user borrow asset.
-
-### Leverage Long Through Uniswap v3
-
-Help user leverage long an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
-
-### Leverage Short Through Uniswap v3
-
-Help user leverage short an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
-
-### Swap Debt Through Uniswap v3
-
-Help user swap debt through Uniswap v3.
-
-### Swap Collateral Thorugh Uniswap v3
-
-Help user swap collateral through Uniswap v3. Need to be careful for the collateral cap.
-
-### Leverage Long Through Uniswap v2
-
-Help user leverage long an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
-
-### Leverage Short Through Uniswap v2
-
-Help user leverage short an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
-
-### Swap Debt Through Uniswap v2
-
-Help user swap debt through Uniswap v2.
-
-### Swap Collateral Thorugh Uniswap v2
-
-Help user swap collateral through Uniswap v2. Need to be careful for the collateral cap.
+- Supply Native Token: Help user wrap Ether into WETH and supply it into Iron Bank.
+- Borrow Native Token: Help user borrow WETH from Iron Bank and unwrap it to Ether.
+- Redeem Native Token: Help user redeem WETH from Iron Bank and unwrap it to Ether.
+- Repay Native Token: Help user wrap Ether into WETH and repay it into Iron Bank. If user repays more than borrow balance, the excessive amount will return to user.
+- Add collateral: Help user supply asset and enter market. Need to be careful for the collateral cap.
+- Borrow: Help user borrow asset.
+- Leverage Long Through Uniswap v3: Help user leverage long an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
+- Leverage Short Through Uniswap v3: Help user leverage short an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
+- Swap Debt Through Uniswap v3: Help user swap debt through Uniswap v3.
+- Swap Collateral Thorugh Uniswap v3: Help user swap collateral through Uniswap v3. Need to be careful for the collateral cap.
+- Leverage Long Through Uniswap v2: Help user leverage long an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
+- Leverage Short Through Uniswap v2: Help user leverage short an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
+- Swap Debt Through Uniswap v2: Help user swap debt through Uniswap v2.
+- Swap Collateral Thorugh Uniswap v2: Help user swap collateral through Uniswap v2. Need to be careful for the collateral cap.
 
 ## Techinical Explanation
 
@@ -82,3 +41,12 @@ From Uniswap's point of view, this is swapping a fixed amount of DAI for a minim
 In addition to collateral swap, open short position and close short position also belong to this category.
 
 For exact input swap, although we already know the amount to pay, we can't pay it at the beginning, because we can't redeem or borrow for users until we supply or repay for users in the last step of the swap. Therefore, we still need to use the same recursive method as the exact output swap.
+
+### Leverage Long And Leverage Short
+
+In essence, leverage long involves using the exact output swap, while leverage short involves using the exact input swap. These two actions are symmetrical and represent the same concept, with the only difference being the amount borrowed from Uniswap or repaid to Uniswap. For instance, in the exact output swap, we borrow `X` amount of asset `A` from Uniswap to supply into Iron Bank and borrow a variable amount of asset `B` from Iron Bank to repay the flash borrow. This action is equivalent to "long `X` amount of asset `A` against asset `B`". In summary:
+
+- To open a long position: Use `exact output swap` with the sub-action `SUB_ACTION_OPEN_LONG_POSITION`.
+- To close a long position: Use `exact input swap` with the sub-action `SUB_ACTION_CLOSE_LONG_POSITION`.
+- To open a short position: Use `exact input swap` with the sub-action `SUB_ACTION_OPEN_SHORT_POSITION`.
+- To close a short position: Use `exact output swap` with the sub-action `SUB_ACTION_CLOSE_SHORT_POSITION`.
