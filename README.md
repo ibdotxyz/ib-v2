@@ -12,7 +12,6 @@
 - [IronBank.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/pool/IronBank.sol) - The core implementation of IB v2.
 - [MarketConfigurator.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/pool/MarketConfigurator.sol) - The admin contract that configures the support markets.
 - [CreditLimitManager.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/pool/CreditLimitManager.sol) - The admin contract that controls the credit limit.
-- [ExtensionRegistry.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/pool/ExtensionRegistry.sol) - The registry contract that contains the user or global extensions.
 - [IBToken.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/token/IBToken.sol) - The recipt contract that represents user supply.
 - [DebtToken.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/token/DebtToken.sol) - The debt contract that represents user borrow.
 - [TripleSlopeRateModel.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol) - The interest rate model contract that calculates the supply and borrow rate.
@@ -21,9 +20,7 @@
 
 ### Extensions
 
-- [Flashloan.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/flashloan/Flashloan.sol) - The extension contract that supports flash loan.
-- [WethExtension.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/extensions/weth/WethExtension.sol) - The extension contract that supports native token.
-- [LevXExtension.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/extensions/levX/LevXExtension.sol) - The extension contract that supports leverage.
+- [IronBankExtension.sol](https://github.com/ibdotxyz/ib-v2/blob/main/src/extensions/IronBankExtension.sol) - The extension contract that supports native token, leverage, debt swap, and collateral swap.
 
 ## Usage
 

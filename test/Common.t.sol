@@ -8,7 +8,6 @@ import "../src/extensions/IronBankExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
-import "../src/protocol/pool/ExtensionRegistry.sol";
 import "../src/protocol/pool/IronBank.sol";
 import "../src/protocol/pool/IronBankProxy.sol";
 import "../src/protocol/pool/MarketConfigurator.sol";
@@ -58,14 +57,6 @@ abstract contract Common is Test {
         vm.prank(_admin);
         creditLimitManager.acceptOwnership();
         return creditLimitManager;
-    }
-
-    function createExtensionRegistry(address _admin, IronBank _ironBank) internal returns (ExtensionRegistry) {
-        ExtensionRegistry extensionRegistry = new ExtensionRegistry(address(_ironBank));
-        extensionRegistry.transferOwnership(_admin);
-        vm.prank(_admin);
-        extensionRegistry.acceptOwnership();
-        return extensionRegistry;
     }
 
     function createIBToken(address _admin, address _pool, address _underlying) internal returns (IBToken) {
@@ -205,7 +196,6 @@ abstract contract Common is Test {
     function createExtension(
         address _admin,
         IronBank _ironBank,
-        ExtensionRegistry _registry,
         address _uniV3Factory,
         address _uniV2Factory,
         address _weth
@@ -214,9 +204,6 @@ abstract contract Common is Test {
         ext.transferOwnership(_admin);
         vm.startPrank(_admin);
         ext.acceptOwnership();
-        address[] memory extensions = new address[](1);
-        extensions[0] = address(ext);
-        _registry.addGlobalExtensions(extensions);
         vm.stopPrank();
         return ext;
     }

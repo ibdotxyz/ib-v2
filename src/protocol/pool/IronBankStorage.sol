@@ -15,8 +15,6 @@ contract IronBankStorage is Constants {
 
     event CreditLimitManagerSet(address manager);
 
-    event ExtensionrRegistrySet(address registry);
-
     event CreditLimitChanged(address user, address market, uint256 credit);
 
     event PriceOracleSet(address priceOracle);
@@ -48,6 +46,10 @@ contract IronBankStorage is Constants {
     event ReservesIncreased(address market, uint256 ibTokenAmount, uint256 amount);
 
     event ReservesDecreased(address market, uint256 ibTokenAmount, uint256 amount, address recipient);
+
+    event ExtensionAdded(address user, address extension);
+
+    event ExtensionRemoved(address user, address extension);
 
     struct UserBorrow {
         uint256 borrowBalance;
@@ -91,6 +93,8 @@ contract IronBankStorage is Constants {
 
     mapping(address => mapping(address => bool)) public enteredMarkets;
     mapping(address => address[]) public allEnteredMarkets;
+    mapping(address => mapping(address => bool)) public allowedExtensions;
+    mapping(address => address[]) public allAllowedExtensions;
     mapping(address => mapping(address => uint256)) public creditLimits;
     mapping(address => address[]) public allCreditMarkets;
     mapping(address => uint8) public liquidityCheckStatus;
@@ -99,5 +103,4 @@ contract IronBankStorage is Constants {
 
     address public marketConfigurator;
     address public creditLimitManager;
-    address public extensionRegistry;
 }
