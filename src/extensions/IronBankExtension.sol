@@ -243,7 +243,6 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
                     ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
@@ -271,7 +270,6 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
-                    ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
                 {
@@ -351,7 +349,6 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
                     ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
@@ -378,7 +375,6 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
-                    ironBank.enterMarket(data.caller, data.swapOutAsset);
                     ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
                 {
@@ -496,7 +492,6 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
         IERC20(asset).safeIncreaseAllowance(address(ironBank), amount);
         ironBank.supply(msg.sender, asset, amount);
-        ironBank.enterMarket(msg.sender, asset);
     }
 
     /**

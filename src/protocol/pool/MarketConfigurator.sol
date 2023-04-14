@@ -22,7 +22,6 @@ contract MarketConfigurator is Ownable2Step, Constants {
     event MarketInterestRateModelSet(address market, address interestRateModel);
     event MarketSupplyCapSet(address market, uint256 cap);
     event MarketBorrowCapSet(address market, uint256 cap);
-    event MarketCollateralCapSet(address market, uint256 cap);
     event MarketPausedSet(address market, string action, bool paused);
     event MarketFrozen(address market, bool state);
 
@@ -253,25 +252,6 @@ contract MarketConfigurator is Ownable2Step, Constants {
             IronBankInterface(_pool).setMarketConfiguration(market, config);
 
             emit MarketBorrowCapSet(market, cap);
-
-            unchecked {
-                i++;
-            }
-        }
-    }
-
-    function setMarketCollateralCaps(MarketCap[] calldata marketCaps) external onlyOwnerOrGuardian {
-        uint256 length = marketCaps.length;
-        for (uint256 i = 0; i < length;) {
-            address market = marketCaps[i].market;
-            uint256 cap = marketCaps[i].cap;
-            IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
-            require(config.isListed, "not listed");
-
-            config.collateralCap = cap;
-            IronBankInterface(_pool).setMarketConfiguration(market, config);
-
-            emit MarketCollateralCapSet(market, cap);
 
             unchecked {
                 i++;

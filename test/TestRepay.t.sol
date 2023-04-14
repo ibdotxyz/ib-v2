@@ -67,7 +67,6 @@ contract RepayTest is Test, Common {
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
         ib.supply(user1, address(market2), 10000e18);
-        ib.enterMarket(user1, address(market2));
         ib.borrow(user1, address(market1), borrowAmount);
         vm.stopPrank();
 
@@ -89,6 +88,7 @@ contract RepayTest is Test, Common {
          */
         assertEq(ib.getBorrowBalance(user1, address(market1)), 200.041472e18);
         assertEq(debtToken1.balanceOf(user1), 200.041472e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(market1.balanceOf(user1), 200e18);
 
         fastForwardTime(86400);
@@ -114,6 +114,7 @@ contract RepayTest is Test, Common {
         assertLt(ib.getBorrowBalance(user1, address(market1)), 100.06566988e18);
         assertGt(debtToken1.balanceOf(user1), 100.06566987e18);
         assertLt(debtToken1.balanceOf(user1), 100.06566988e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(market1.balanceOf(user1), 200e18);
 
         fastForwardTime(86400);
@@ -127,11 +128,12 @@ contract RepayTest is Test, Common {
 
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);
         assertEq(debtToken1.balanceOf(user1), 0);
+        assertFalse(ib.isEnteredMarket(user1, address(market1)));
         assertLt(market1.balanceOf(user1), 100e18);
 
         // There is no borrower but the total borrow is still greater than 0.
         // The reason is the same as above.
-        (, uint256 totalBorrow,,,) = ib.getMarketStatus(address(market1));
+        (, uint256 totalBorrow,,) = ib.getMarketStatus(address(market1));
         assertGt(totalBorrow, 0);
     }
 
@@ -147,7 +149,6 @@ contract RepayTest is Test, Common {
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
         ib.supply(user1, address(market2), 10000e18);
-        ib.enterMarket(user1, address(market2));
         ib.borrow(user1, address(market1), borrowAmount);
 
         vm.expectRevert("ERC20: insufficient allowance");
@@ -166,7 +167,6 @@ contract RepayTest is Test, Common {
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
         ib.supply(user1, address(market2), 10000e18);
-        ib.enterMarket(user1, address(market2));
         ib.borrow(user1, address(market1), borrowAmount);
 
         // Transfer out on purpose.
@@ -223,7 +223,6 @@ contract RepayTest is Test, Common {
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
         ib.supply(user1, address(market2), 10000e18);
-        ib.enterMarket(user1, address(market2));
         ib.borrow(user1, address(market1), borrowAmount);
 
         market1.approve(address(ib), repayAmount);

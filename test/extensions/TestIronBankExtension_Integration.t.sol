@@ -468,7 +468,6 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
         ib.supply(user1, DAI, supplyAmount);
-        ib.enterMarket(user1, DAI);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
@@ -715,7 +714,6 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
         ib.supply(user1, DAI, supplyAmount);
-        ib.enterMarket(user1, DAI);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
@@ -743,7 +741,6 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), 1000000e18);
         ib.supply(user1, DAI, 1000000e18);
-        ib.enterMarket(user1, DAI);
         vm.stopPrank();
     }
 }
