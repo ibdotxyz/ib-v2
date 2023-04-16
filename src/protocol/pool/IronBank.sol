@@ -10,7 +10,6 @@ import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.s
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "./IronBankStorage.sol";
 import "../../interfaces/DeferLiquidityCheckInterface.sol";
-import "../../interfaces/ExtensionRegistryInterface.sol";
 import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
@@ -109,6 +108,14 @@ contract IronBank is
 
     function isEnteredMarket(address user, address market) public view returns (bool) {
         return enteredMarkets[user][market];
+    }
+
+    function getUserAllowedExtensions(address user) public view returns (address[] memory) {
+        return allAllowedExtensions[user];
+    }
+
+    function isAllowedExtension(address user, address extension) public view returns (bool) {
+        return allowedExtensions[user][extension];
     }
 
     function getCreditLimit(address user, address market) public view returns (uint256) {
@@ -371,6 +378,20 @@ contract IronBank is
         }
     }
 
+    function setUserExtension(address extension, bool allowed) external nonReentrant {
+        if (allowed && !allowedExtensions[msg.sender][extension]) {
+            allowedExtensions[msg.sender][extension] = true;
+            allAllowedExtensions[msg.sender].push(extension);
+
+            emit ExtensionAdded(msg.sender, extension);
+        } else if (!allowed && allowedExtensions[msg.sender][extension]) {
+            allowedExtensions[msg.sender][extension] = false;
+            allAllowedExtensions[msg.sender].deleteElement(extension);
+
+            emit ExtensionRemoved(msg.sender, extension);
+        }
+    }
+
     /* ========== TOKEN HOOKS ========== */
 
     function transferDebt(address market, address from, address to, uint256 amount) external nonReentrant {
@@ -470,12 +491,6 @@ contract IronBank is
         emit CreditLimitManagerSet(manager);
     }
 
-    function setExtensionRegistry(address registry) external onlyOwner {
-        extensionRegistry = registry;
-
-        emit ExtensionrRegistrySet(registry);
-    }
-
     function seize(address token, address recipient) external onlyOwner {
         Market storage m = markets[token];
 
@@ -524,14 +539,7 @@ contract IronBank is
     }
 
     function _checkAuthorized(address user) internal view {
-        require(
-            msg.sender == user
-                || (
-                    !isCreditAccount(user) && extensionRegistry != address(0)
-                        && ExtensionRegistryInterface(extensionRegistry).isAuthorized(user, msg.sender)
-                ),
-            "!authorized"
-        );
+        require(msg.sender == user || (!isCreditAccount(user) && isAllowedExtension(user, msg.sender)), "!authorized");
     }
 
     function _checkMarketConfigurator() internal view {

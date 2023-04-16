@@ -30,7 +30,6 @@ contract IronBankExtensionIntegrationTest is Test, Common {
     IronBank ib;
     MarketConfigurator configurator;
     CreditLimitManager creditLimitManager;
-    ExtensionRegistry extensionRegistry;
     PriceOracle oracle;
     IronBankExtension extension;
 
@@ -49,9 +48,6 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         creditLimitManager = createCreditLimitManager(admin, ib);
         ib.setCreditLimitManager(address(creditLimitManager));
-
-        extensionRegistry = createExtensionRegistry(admin, ib);
-        ib.setExtensionRegistry(address(extensionRegistry));
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
@@ -89,7 +85,10 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         IERC20(USDT).safeTransfer(user1, 10000000e6);
         vm.stopPrank();
 
-        extension = createExtension(admin, ib, extensionRegistry, uniswapV3Factory, uniswapV2Factory, WETH);
+        extension = createExtension(admin, ib, uniswapV3Factory, uniswapV2Factory, WETH);
+
+        vm.prank(user1);
+        ib.setUserExtension(address(extension), true);
     }
 
     function testSupplyEther() public {
