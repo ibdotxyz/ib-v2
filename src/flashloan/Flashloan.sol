@@ -68,8 +68,7 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
     function _loan(IERC3156FlashBorrower receiver, address token, uint256 amount, bytes memory data, address msgSender)
         internal
     {
-        IronBankInterface(_pool).borrow(address(this), token, amount);
-        IERC20(token).safeTransfer(address(receiver), amount);
+        IronBankInterface(_pool).borrow(address(receiver), address(receiver), token, amount);
 
         require(receiver.onFlashLoan(msgSender, token, amount, 0, data) == CALLBACK_SUCCESS, "callback failed");
 
@@ -81,6 +80,6 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
             IERC20(token).safeApprove(_pool, type(uint256).max);
         }
 
-        IronBankInterface(_pool).repay(address(this), token, amount);
+        IronBankInterface(_pool).repay(address(this), address(receiver), token, amount);
     }
 }

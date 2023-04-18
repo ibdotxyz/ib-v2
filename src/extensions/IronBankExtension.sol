@@ -243,9 +243,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.supply(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
-                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.repay(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -253,11 +253,11 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
             if (tokenIn == data.swapInAsset) {
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION) {
-                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.borrow(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else if (
                     data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL
                 ) {
-                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.redeem(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -270,10 +270,10 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
-                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.supply(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
                 {
-                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.repay(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -291,9 +291,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 uniV3AmountInCached = amountToPay;
 
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
-                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.borrow(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION) {
-                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.redeem(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -349,9 +349,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL) {
-                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.supply(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_LONG_POSITION) {
-                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.repay(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -359,11 +359,11 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
 
             if (tokenIn == data.swapInAsset) {
                 if (data.subAction == SUB_ACTION_OPEN_SHORT_POSITION) {
-                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.borrow(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else if (
                     data.subAction == SUB_ACTION_CLOSE_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_COLLATERAL
                 ) {
-                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.redeem(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -375,10 +375,10 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION) {
-                    ironBank.supply(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.supply(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT)
                 {
-                    ironBank.repay(data.caller, data.swapOutAsset, amountReceived);
+                    ironBank.repay(address(this), data.caller, data.swapOutAsset, amountReceived);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -395,9 +395,9 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 uniV2AmountInCached = amountToPay;
 
                 if (data.subAction == SUB_ACTION_OPEN_LONG_POSITION || data.subAction == SUB_ACTION_SWAP_DEBT) {
-                    ironBank.borrow(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.borrow(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else if (data.subAction == SUB_ACTION_CLOSE_SHORT_POSITION) {
-                    ironBank.redeem(data.caller, data.swapInAsset, amountToPay);
+                    ironBank.redeem(data.caller, address(this), data.swapInAsset, amountToPay);
                 } else {
                     revert("invalid sub-action");
                 }
@@ -436,7 +436,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     function supplyNativeToken() internal nonReentrant {
         WethInterface(weth).deposit{value: msg.value}();
         IERC20(weth).safeIncreaseAllowance(address(ironBank), msg.value);
-        ironBank.supply(msg.sender, weth, msg.value);
+        ironBank.supply(address(this), msg.sender, weth, msg.value);
     }
 
     /**
@@ -444,7 +444,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param borrowAmount The amount of the wrapped native token to borrow.
      */
     function borrowNativeToken(uint256 borrowAmount) internal nonReentrant {
-        ironBank.borrow(msg.sender, weth, borrowAmount);
+        ironBank.borrow(msg.sender, address(this), weth, borrowAmount);
         WethInterface(weth).withdraw(borrowAmount);
         (bool sent,) = msg.sender.call{value: borrowAmount}("");
         require(sent, "failed to send native token");
@@ -455,7 +455,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param redeemAmount The amount of the wrapped native token to redeem.
      */
     function redeemNativeToken(uint256 redeemAmount) internal nonReentrant {
-        ironBank.redeem(msg.sender, weth, redeemAmount);
+        ironBank.redeem(msg.sender, address(this), weth, redeemAmount);
         WethInterface(weth).withdraw(redeemAmount);
         (bool sent,) = msg.sender.call{value: redeemAmount}("");
         require(sent, "failed to send native token");
@@ -473,13 +473,13 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
         if (repayAmount > borrowBalance) {
             WethInterface(weth).deposit{value: borrowBalance}();
             IERC20(weth).safeIncreaseAllowance(address(ironBank), borrowBalance);
-            ironBank.repay(msg.sender, weth, borrowBalance);
+            ironBank.repay(address(this), msg.sender, weth, borrowBalance);
             (bool sent,) = msg.sender.call{value: repayAmount - borrowBalance}("");
             require(sent, "failed to send native token");
         } else {
             WethInterface(weth).deposit{value: repayAmount}();
             IERC20(weth).safeIncreaseAllowance(address(ironBank), repayAmount);
-            ironBank.repay(msg.sender, weth, repayAmount);
+            ironBank.repay(address(this), msg.sender, weth, repayAmount);
         }
     }
 
@@ -489,9 +489,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param amount The amount of the collateral asset to supply.
      */
     function addCollateral(address asset, uint256 amount) internal nonReentrant {
-        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
-        IERC20(asset).safeIncreaseAllowance(address(ironBank), amount);
-        ironBank.supply(msg.sender, asset, amount);
+        ironBank.supply(msg.sender, msg.sender, asset, amount);
     }
 
     /**
@@ -500,8 +498,7 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * @param amount The amount of the asset to borrow.
      */
     function borrow(address asset, uint256 amount) internal nonReentrant {
-        ironBank.borrow(msg.sender, asset, amount);
-        IERC20(asset).safeTransfer(msg.sender, amount);
+        ironBank.borrow(msg.sender, msg.sender, asset, amount);
     }
 
     /**

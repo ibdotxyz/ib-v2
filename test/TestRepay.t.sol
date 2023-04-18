@@ -61,13 +61,13 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), 500e18);
-        ib.supply(admin, address(market1), 500e18);
+        ib.supply(admin, admin, address(market1), 500e18);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
-        ib.supply(user1, address(market2), 10000e18);
-        ib.borrow(user1, address(market1), borrowAmount);
+        ib.supply(user1, user1, address(market2), 10000e18);
+        ib.borrow(user1, user1, address(market1), borrowAmount);
         vm.stopPrank();
 
         fastForwardTime(86400);
@@ -76,7 +76,7 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), repayAmount);
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user1, user1, address(market1), repayAmount);
         vm.stopPrank();
 
         /**
@@ -97,7 +97,7 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(user2);
         market1.approve(address(ib), repayAmount);
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user2, user1, address(market1), repayAmount);
         vm.stopPrank();
 
         /**
@@ -123,8 +123,11 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market1), type(uint256).max);
+        ib.setUserExtension(user2, true);
         vm.stopPrank();
+
+        vm.prank(user2);
+        ib.repay(user1, user1, address(market1), type(uint256).max);
 
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);
         assertEq(debtToken1.balanceOf(user1), 0);
@@ -143,16 +146,16 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), 500e18);
-        ib.supply(admin, address(market1), 500e18);
+        ib.supply(admin, admin, address(market1), 500e18);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
-        ib.supply(user1, address(market2), 10000e18);
-        ib.borrow(user1, address(market1), borrowAmount);
+        ib.supply(user1, user1, address(market2), 10000e18);
+        ib.borrow(user1, user1, address(market1), borrowAmount);
 
         vm.expectRevert("ERC20: insufficient allowance");
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user1, user1, address(market1), repayAmount);
     }
 
     function testCannotRepayForInsufficientBalance() public {
@@ -161,13 +164,13 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), 500e18);
-        ib.supply(admin, address(market1), 500e18);
+        ib.supply(admin, admin, address(market1), 500e18);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
-        ib.supply(user1, address(market2), 10000e18);
-        ib.borrow(user1, address(market1), borrowAmount);
+        ib.supply(user1, user1, address(market2), 10000e18);
+        ib.borrow(user1, user1, address(market1), borrowAmount);
 
         // Transfer out on purpose.
         market1.transfer(user2, borrowAmount);
@@ -175,8 +178,16 @@ contract RepayTest is Test, Common {
         market1.approve(address(ib), repayAmount);
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user1, user1, address(market1), repayAmount);
         vm.stopPrank();
+    }
+
+    function testCannotForUnauthorized() public {
+        uint256 repayAmount = 50e18;
+
+        vm.prank(user2);
+        vm.expectRevert("!authorized");
+        ib.repay(user1, user1, address(market1), repayAmount);
     }
 
     function testCannotRepayForMarketNotListed() public {
@@ -186,7 +197,7 @@ contract RepayTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.repay(user1, address(invalidMarket), repayAmount);
+        ib.repay(user1, user1, address(invalidMarket), repayAmount);
     }
 
     function testCannotRepayForMarketFrozen() public {
@@ -197,7 +208,7 @@ contract RepayTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("frozen");
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user1, user1, address(market1), repayAmount);
     }
 
     function testCannotRepayForCreditAccount() public {
@@ -207,8 +218,8 @@ contract RepayTest is Test, Common {
         creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
 
         vm.prank(user2);
-        vm.expectRevert("cannot repay for credit account");
-        ib.repay(user1, address(market1), repayAmount);
+        vm.expectRevert("credit account can only repay for itself");
+        ib.repay(user2, user1, address(market1), repayAmount);
     }
 
     function testCannotRepayForRepayTooMuch() public {
@@ -217,19 +228,19 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), 500e18);
-        ib.supply(admin, address(market1), 500e18);
+        ib.supply(admin, admin, address(market1), 500e18);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), 10000e18);
-        ib.supply(user1, address(market2), 10000e18);
-        ib.borrow(user1, address(market1), borrowAmount);
+        ib.supply(user1, user1, address(market2), 10000e18);
+        ib.borrow(user1, user1, address(market1), borrowAmount);
 
         market1.approve(address(ib), repayAmount);
 
         // Repay too much will cause the subtraction underflow.
         vm.expectRevert(stdError.arithmeticError);
-        ib.repay(user1, address(market1), repayAmount);
+        ib.repay(user1, user1, address(market1), repayAmount);
         vm.stopPrank();
     }
 }

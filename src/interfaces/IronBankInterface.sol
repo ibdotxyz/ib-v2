@@ -9,13 +9,13 @@ interface IronBankInterface {
 
     function accrueInterest(address market) external;
 
-    function supply(address user, address market, uint256 amount) external;
+    function supply(address from, address to, address market, uint256 amount) external;
 
-    function borrow(address user, address asset, uint256 amount) external;
+    function borrow(address from, address to, address asset, uint256 amount) external;
 
-    function redeem(address user, address asset, uint256 amount) external;
+    function redeem(address from, address to, address asset, uint256 amount) external;
 
-    function repay(address user, address asset, uint256 amount) external;
+    function repay(address from, address to, address asset, uint256 amount) external;
 
     function deferLiquidityCheck(address user, bytes memory data) external;
 

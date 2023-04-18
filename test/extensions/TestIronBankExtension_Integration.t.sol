@@ -69,19 +69,19 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         // Inject liquidity into pool and user1.
         vm.startPrank(wethHolder);
         IERC20(WETH).safeIncreaseAllowance(address(ib), 10000e18);
-        ib.supply(wethHolder, WETH, 10000e18);
+        ib.supply(wethHolder, wethHolder, WETH, 10000e18);
         IERC20(WETH).safeTransfer(user1, 10000e18);
         vm.stopPrank();
 
         vm.startPrank(daiHolder);
         IERC20(DAI).safeIncreaseAllowance(address(ib), 10000000e18);
-        ib.supply(daiHolder, DAI, 10000000e18);
+        ib.supply(daiHolder, daiHolder, DAI, 10000000e18);
         IERC20(DAI).safeTransfer(user1, 10000000e18);
         vm.stopPrank();
 
         vm.startPrank(usdtHolder);
         IERC20(USDT).safeIncreaseAllowance(address(ib), 10000000e6);
-        ib.supply(usdtHolder, USDT, 10000000e6);
+        ib.supply(usdtHolder, usdtHolder, USDT, 10000000e6);
         IERC20(USDT).safeTransfer(user1, 10000000e6);
         vm.stopPrank();
 
@@ -125,7 +125,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         IERC20(WETH).safeIncreaseAllowance(address(ib), supplyAmount);
-        ib.supply(user1, WETH, supplyAmount);
+        ib.supply(user1, user1, WETH, supplyAmount);
         vm.stopPrank();
 
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
@@ -195,7 +195,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint256 userDaiBefore = IERC20(DAI).balanceOf(user1);
 
         vm.startPrank(user1);
-        IERC20(DAI).safeIncreaseAllowance(address(extension), supplyAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
         IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](2);
         actions[0] = IronBankExtension.Action({name: "ACTION_ADD_COLLATERAL", data: abi.encode(DAI, supplyAmount)});
         actions[1] = IronBankExtension.Action({name: "ACTION_BORROW", data: abi.encode(USDT, borrowAmount)});
@@ -218,7 +218,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
@@ -268,7 +268,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
@@ -323,7 +323,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
@@ -374,7 +374,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
@@ -431,7 +431,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint256 borrowAmount = 100e18;
 
         vm.startPrank(user1);
-        ib.borrow(user1, DAI, borrowAmount);
+        ib.borrow(user1, user1, DAI, borrowAmount);
 
         assertTrue(ib.getBorrowBalance(user1, DAI) == borrowAmount);
         assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
@@ -466,7 +466,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
-        ib.supply(user1, DAI, supplyAmount);
+        ib.supply(user1, user1, DAI, supplyAmount);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
@@ -499,7 +499,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
@@ -544,7 +544,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = WETH;
@@ -589,7 +589,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
@@ -635,7 +635,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(extension), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
 
         address[] memory path = new address[](3);
         path[0] = DAI;
@@ -682,7 +682,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         uint256 borrowAmount = 100e18;
 
         vm.startPrank(user1);
-        ib.borrow(user1, DAI, borrowAmount);
+        ib.borrow(user1, user1, DAI, borrowAmount);
 
         assertTrue(ib.getBorrowBalance(user1, DAI) == borrowAmount);
         assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
@@ -712,7 +712,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
-        ib.supply(user1, DAI, supplyAmount);
+        ib.supply(user1, user1, DAI, supplyAmount);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getSupplyBalance(user1, USDT) == 0);
@@ -739,7 +739,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), 1000000e18);
-        ib.supply(user1, DAI, 1000000e18);
+        ib.supply(user1, user1, DAI, 1000000e18);
         vm.stopPrank();
     }
 }
