@@ -27,23 +27,29 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      * User actions
      */
 
-    /// @notice The action for supply native token
+    /// @notice The action for supplying native token
     bytes32 public constant ACTION_SUPPLY_NATIVE_TOKEN = "ACTION_SUPPLY_NATIVE_TOKEN";
 
-    /// @notice The action for borrow native token
+    /// @notice The action for borrowing native token
     bytes32 public constant ACTION_BORROW_NATIVE_TOKEN = "ACTION_BORROW_NATIVE_TOKEN";
 
-    /// @notice The action for redeem native token
+    /// @notice The action for redeeming native token
     bytes32 public constant ACTION_REDEEM_NATIVE_TOKEN = "ACTION_REDEEM_NATIVE_TOKEN";
 
-    /// @notice The action for repay native token
+    /// @notice The action for repaying native token
     bytes32 public constant ACTION_REPAY_NATIVE_TOKEN = "ACTION_REPAY_NATIVE_TOKEN";
 
-    /// @notice The action for add collateral
-    bytes32 public constant ACTION_ADD_COLLATERAL = "ACTION_ADD_COLLATERAL";
+    /// @notice The action for supplying asset
+    bytes32 public constant ACTION_SUPPLY = "ACTION_SUPPLY";
 
-    /// @notice The action for borrow asset
+    /// @notice The action for borrowing asset
     bytes32 public constant ACTION_BORROW = "ACTION_BORROW";
+
+    /// @notice The action for redeeming asset
+    bytes32 public constant ACTION_REDEEM = "ACTION_REDEEM";
+
+    /// @notice The action for repaying asset
+    bytes32 public constant ACTION_REPAY = "ACTION_REPAY";
 
     /// @notice The action for exact output swap thru Uniswap v3
     bytes32 public constant ACTION_UNISWAP_V3_EXACT_OUTPUT = "ACTION_UNISWAP_V3_EXACT_OUTPUT";
@@ -57,22 +63,22 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     /// @notice The action for exact input swap thru Uniswap v2
     bytes32 public constant ACTION_UNISWAP_V2_EXACT_INPUT = "ACTION_UNISWAP_V2_EXACT_INPUT";
 
-    /// @notice The sub-action for open long position
+    /// @notice The sub-action for opening long position
     bytes32 public constant SUB_ACTION_OPEN_LONG_POSITION = "SUB_ACTION_OPEN_LONG_POSITION";
 
-    /// @notice The sub-action for close long position
+    /// @notice The sub-action for closing long position
     bytes32 public constant SUB_ACTION_CLOSE_LONG_POSITION = "SUB_ACTION_CLOSE_LONG_POSITION";
 
-    /// @notice The sub-action for open short position
+    /// @notice The sub-action for opening short position
     bytes32 public constant SUB_ACTION_OPEN_SHORT_POSITION = "SUB_ACTION_OPEN_SHORT_POSITION";
 
-    /// @notice The sub-action for close short position
+    /// @notice The sub-action for closing short position
     bytes32 public constant SUB_ACTION_CLOSE_SHORT_POSITION = "SUB_ACTION_CLOSE_SHORT_POSITION";
 
-    /// @notice The sub-action for swap debt
+    /// @notice The sub-action for swapping debt
     bytes32 public constant SUB_ACTION_SWAP_DEBT = "SUB_ACTION_SWAP_DEBT";
 
-    /// @notice The sub-action for swap collateral
+    /// @notice The sub-action for swapping collateral
     bytes32 public constant SUB_ACTION_SWAP_COLLATERAL = "SUB_ACTION_SWAP_COLLATERAL";
 
     /// @dev Used as the placeholder value for uniV3AmountInCached, uniV3AmountOutCached, uniV2AmountInCached and
@@ -144,12 +150,18 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
                 redeemNativeToken(redeemAmount);
             } else if (action.name == ACTION_REPAY_NATIVE_TOKEN) {
                 repayNativeToken();
-            } else if (action.name == ACTION_ADD_COLLATERAL) {
+            } else if (action.name == ACTION_SUPPLY) {
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
-                addCollateral(asset, amount);
+                supply(asset, amount);
             } else if (action.name == ACTION_BORROW) {
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
                 borrow(asset, amount);
+            } else if (action.name == ACTION_REDEEM) {
+                (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
+                redeem(asset, amount);
+            } else if (action.name == ACTION_REPAY) {
+                (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
+                repay(asset, amount);
             } else if (action.name == ACTION_UNISWAP_V3_EXACT_OUTPUT) {
                 (
                     address swapOutAsset,
@@ -484,11 +496,11 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
     }
 
     /**
-     * @notice Supplies the collateral to Iron Bank.
-     * @param asset The address of the collateral asset.
-     * @param amount The amount of the collateral asset to supply.
+     * @notice Supplies the asset to Iron Bank.
+     * @param asset The address of the asset to supply.
+     * @param amount The amount of the asset to supply.
      */
-    function addCollateral(address asset, uint256 amount) internal nonReentrant {
+    function supply(address asset, uint256 amount) internal nonReentrant {
         ironBank.supply(msg.sender, msg.sender, asset, amount);
     }
 
@@ -499,6 +511,24 @@ contract IronBankExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallb
      */
     function borrow(address asset, uint256 amount) internal nonReentrant {
         ironBank.borrow(msg.sender, msg.sender, asset, amount);
+    }
+
+    /**
+     * @notice Redeems the asset to Iron Bank.
+     * @param asset The address of the asset to redeem.
+     * @param amount The amount of the asset to redeem.
+     */
+    function redeem(address asset, uint256 amount) internal nonReentrant {
+        ironBank.redeem(msg.sender, msg.sender, asset, amount);
+    }
+
+    /**
+     * @notice Repays the asset to Iron Bank.
+     * @param asset The address of the asset to repay.
+     * @param amount The amount of the asset to repay.
+     */
+    function repay(address asset, uint256 amount) internal nonReentrant {
+        ironBank.repay(msg.sender, msg.sender, asset, amount);
     }
 
     /**
