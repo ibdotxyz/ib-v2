@@ -65,15 +65,94 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, address(market2), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
+        assertEq(market2.balanceOf(user1), market2BorrowAmount);
+        assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
+        assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertTrue(ib.isEnteredMarket(user1, address(market2)));
+
+        address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
+        assertEq(userEnteredMarkets.length, 2);
+        assertEq(userEnteredMarkets[0], address(market1));
+        assertEq(userEnteredMarkets[1], address(market2));
+
+        /**
+         * collateral value = 100 * 0.8 * 1500 = 120,000
+         * borrowed value = 500 * 200 = 100,000
+         */
+        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 120_000e18);
+        assertEq(debtValue, 100_000e18);
+    }
+
+    function testBorrowToOther() public {
+        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
+        vm.stopPrank();
+
+        uint256 user2Market2BalanceBefore = market2.balanceOf(user2);
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), market1SupplyAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user2, address(market2), market2BorrowAmount);
+        vm.stopPrank();
+
+        uint256 user2Market2BalanceAfter = market2.balanceOf(user2);
+
+        assertEq(market2.balanceOf(user1), 0);
+        assertEq(user2Market2BalanceAfter - user2Market2BalanceBefore, market2BorrowAmount);
+        assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
+        assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertTrue(ib.isEnteredMarket(user1, address(market2)));
+
+        address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
+        assertEq(userEnteredMarkets.length, 2);
+        assertEq(userEnteredMarkets[0], address(market1));
+        assertEq(userEnteredMarkets[1], address(market2));
+
+        /**
+         * collateral value = 100 * 0.8 * 1500 = 120,000
+         * borrowed value = 500 * 200 = 100,000
+         */
+        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 120_000e18);
+        assertEq(debtValue, 100_000e18);
+    }
+
+    function testBorrowOnBehalf() public {
+        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), market1SupplyAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.setUserExtension(user2, true);
+        vm.stopPrank();
+
+        vm.prank(user2);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
+
+        assertEq(market2.balanceOf(user1), market2BorrowAmount);
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
@@ -100,13 +179,13 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user2, address(market2), market2SupplyAmount);
+        ib.supply(user2, user2, address(market2), market2SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
@@ -138,14 +217,14 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
-        ib.supply(user2, address(market2), borrowAmount);
+        ib.supply(user2, user2, address(market2), borrowAmount);
         vm.stopPrank();
 
         vm.prank(admin);
         creditLimitManager.setCreditLimit(user1, address(market2), borrowAmount);
 
         vm.prank(user1);
-        ib.borrow(user1, address(market2), borrowAmount);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
 
         uint256 userBorrowBalance = ib.getBorrowBalance(user1, address(market2));
         assertEq(userBorrowBalance, borrowAmount);
@@ -168,7 +247,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("!authorized");
-        ib.borrow(user2, address(market2), borrowAmount);
+        ib.borrow(user2, user2, address(market2), borrowAmount);
     }
 
     function testCannotBorrowForMarketNotListed() public {
@@ -178,7 +257,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.borrow(user1, address(invalidMarket), borrowAmount);
+        ib.borrow(user1, user1, address(invalidMarket), borrowAmount);
     }
 
     function testCannotBorrowForMarketFrozen() public {
@@ -189,7 +268,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("frozen");
-        ib.borrow(user1, address(market2), borrowAmount);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
     }
 
     function testCannotBorrowForMarketBorrowPaused() public {
@@ -200,7 +279,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("borrow paused");
-        ib.borrow(user1, address(market2), borrowAmount);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
     }
 
     function testCannotBorrowForInsufficientCash() public {
@@ -208,12 +287,12 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
-        ib.supply(user2, address(market2), borrowAmount);
+        ib.supply(user2, user2, address(market2), borrowAmount);
         vm.stopPrank();
 
         vm.prank(user1);
         vm.expectRevert("insufficient cash");
-        ib.borrow(user1, address(market2), borrowAmount + 1);
+        ib.borrow(user1, user1, address(market2), borrowAmount + 1);
     }
 
     function testCannotBorrowForBorrowCapReached() public {
@@ -222,7 +301,7 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
-        ib.supply(user2, address(market2), borrowAmount);
+        ib.supply(user2, user2, address(market2), borrowAmount);
         vm.stopPrank();
 
         vm.prank(admin);
@@ -230,7 +309,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("borrow cap reached");
-        ib.borrow(user1, address(market2), borrowAmount);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
     }
 
     function testCannotBorrowForInsufficientCreditLimit() public {
@@ -238,7 +317,7 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
-        ib.supply(user2, address(market2), borrowAmount);
+        ib.supply(user2, user2, address(market2), borrowAmount);
         vm.stopPrank();
 
         vm.prank(admin);
@@ -246,7 +325,7 @@ contract BorrowTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("insufficient credit limit");
-        ib.borrow(user1, address(market2), borrowAmount);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
     }
 
     function testCannotBorrowForInsufficientCollateral() public {
@@ -259,14 +338,14 @@ contract BorrowTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, address(market2), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
         vm.expectRevert("insufficient collateral");
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
     }
 }

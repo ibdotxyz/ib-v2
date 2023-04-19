@@ -45,7 +45,7 @@ contract SupplyTest is Test, Common {
         vm.startPrank(user1);
         market.approve(address(ib), supplyAmount);
 
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
 
         assertEq(ibToken.balanceOf(user1), 100e18);
         assertEq(ibToken.totalSupply(), 100e18);
@@ -64,17 +64,17 @@ contract SupplyTest is Test, Common {
 
         vm.startPrank(user1);
         market.approve(address(ib), type(uint256).max);
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user2);
         market.approve(address(ib), type(uint256).max);
-        ib.supply(user2, address(market), supplyAmount);
+        ib.supply(user2, user2, address(market), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
-        ib.supply(user1, address(market), supplyAmount);
-        ib.supply(user2, address(market), supplyAmount); // supply for user2
+        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user2, address(market), supplyAmount); // supply for user2
         vm.stopPrank();
 
         assertEq(ibToken.balanceOf(user1), 200e18);
@@ -88,12 +88,29 @@ contract SupplyTest is Test, Common {
         assertEq(totalSupply, 400e18);
     }
 
+    function testSupplyOnBehalf() public {
+        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+
+        vm.startPrank(user1);
+        market.approve(address(ib), supplyAmount);
+        ib.setUserExtension(user2, true);
+        vm.stopPrank();
+
+        vm.prank(user2);
+        ib.supply(user1, user2, address(market), supplyAmount);
+
+        assertEq(ibToken.balanceOf(user2), 100e18);
+        assertEq(ibToken.totalSupply(), 100e18);
+        assertEq(ib.getSupplyBalance(user2, address(market)), 100e18);
+        assertTrue(ib.isEnteredMarket(user2, address(market)));
+    }
+
     function testCannotSupplyForInsufficientAllowance() public {
         uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
 
         vm.prank(user1);
         vm.expectRevert("ERC20: insufficient allowance");
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 
     function testCannotSupplyForInsufficientBalance() public {
@@ -103,7 +120,15 @@ contract SupplyTest is Test, Common {
         market.approve(address(ib), supplyAmount);
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
+    }
+
+    function testCannotSupplyForUnauthorized() public {
+        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+
+        vm.prank(user2);
+        vm.expectRevert("!authorized");
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 
     function testCannotSupplyForMarketNotListed() public {
@@ -113,7 +138,7 @@ contract SupplyTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.supply(user1, address(invalidMarket), supplyAmount);
+        ib.supply(user1, user1, address(invalidMarket), supplyAmount);
     }
 
     function testCannotSupplyForMarketFrozen() public {
@@ -124,7 +149,7 @@ contract SupplyTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("frozen");
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 
     function testCannotSupplyForMarketSupplyPaused() public {
@@ -135,18 +160,18 @@ contract SupplyTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("supply paused");
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 
-    function testCannotSupplyForCreditAccount() public {
+    function testCannotSupplyToCreditAccount() public {
         uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
 
         vm.prank(admin);
         creditLimitManager.setCreditLimit(user1, address(market), 1); // amount not important
 
         vm.prank(user1);
-        vm.expectRevert("credit account cannot supply");
-        ib.supply(user1, address(market), supplyAmount);
+        vm.expectRevert("cannot supply to credit account");
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 
     function testCannotSupplyForSupplyCapReached() public {
@@ -158,6 +183,6 @@ contract SupplyTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("supply cap reached");
-        ib.supply(user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market), supplyAmount);
     }
 }

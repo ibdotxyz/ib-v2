@@ -77,15 +77,15 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(admin);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(admin, address(market2), market2SupplyAmount);
+        ib.supply(admin, admin, address(market2), market2SupplyAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market2)), 10 ** underlyingDecimals2);
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market2)), 10 ** underlyingDecimals2);
@@ -117,11 +117,11 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(user1);
         market2.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market2), type(uint256).max);
+        ib.repay(user1, user1, address(market2), type(uint256).max);
         vm.stopPrank();
 
         vm.prank(admin);
-        ib.redeem(admin, address(market2), type(uint256).max);
+        ib.redeem(admin, admin, address(market2), type(uint256).max);
 
         /**
          * admin market2 amount = 500 * 1.000074 = 500.037
@@ -151,8 +151,8 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market1)), 10 ** underlyingDecimals1);
@@ -172,18 +172,18 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(admin, address(market1), market1SupplyAmount);
+        ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.borrow(user1, address(market1), market1BorrowAmount);
+        ib.supply(user1, user1, address(market2), market2SupplyAmount);
+        ib.borrow(user1, user1, address(market1), market1BorrowAmount);
 
         fastForwardTime(86400);
 
         market1.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market1), type(uint256).max);
+        ib.repay(user1, user1, address(market1), type(uint256).max);
         vm.stopPrank();
 
         uint256 exchangeRate = ib.getExchangeRate(address(market1));
@@ -195,8 +195,8 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
-        ib.redeem(user1, address(market1), type(uint256).max);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        ib.redeem(user1, user1, address(market1), type(uint256).max);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market1)), exchangeRate); // exchange rate won't change
@@ -212,15 +212,15 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(admin, address(market1), market1SupplyAmount);
+        ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market1)), 10 ** underlyingDecimals1);
 
         vm.startPrank(user1);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.borrow(user1, address(market1), market1BorrowAmount);
+        ib.supply(user1, user1, address(market2), market2SupplyAmount);
+        ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market1)), 10 ** underlyingDecimals1);
@@ -252,11 +252,11 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market1), type(uint256).max);
+        ib.repay(user1, user1, address(market1), type(uint256).max);
         vm.stopPrank();
 
         vm.prank(admin);
-        ib.redeem(admin, address(market1), type(uint256).max);
+        ib.redeem(admin, admin, address(market1), type(uint256).max);
 
         /**
          * admin market1 amount = 500 * 1.0000746496 = 500.0373248
@@ -284,15 +284,15 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(admin);
         market3.approve(address(ib), market3SupplyAmount);
-        ib.supply(admin, address(market3), market3SupplyAmount);
+        ib.supply(admin, admin, address(market3), market3SupplyAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market3)), 10 ** underlyingDecimals3);
 
         vm.startPrank(user1);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.borrow(user1, address(market3), market3BorrowAmount);
+        ib.supply(user1, user1, address(market2), market2SupplyAmount);
+        ib.borrow(user1, user1, address(market3), market3BorrowAmount);
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market3)), 10 ** underlyingDecimals3);
@@ -322,11 +322,11 @@ contract ExchangeRateTest is Test, Common {
 
         vm.startPrank(user1);
         market3.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market3), type(uint256).max);
+        ib.repay(user1, user1, address(market3), type(uint256).max);
         vm.stopPrank();
 
         vm.prank(admin);
-        ib.redeem(admin, address(market3), type(uint256).max);
+        ib.redeem(admin, admin, address(market3), type(uint256).max);
 
         /**
          * admin market3 amount = 500 * 1.000082944 = 500.041472

@@ -46,8 +46,8 @@ contract IronBank is
         _;
     }
 
-    modifier isAuthorized(address user) {
-        _checkAuthorized(user);
+    modifier isAuthorized(address from) {
+        _checkAuthorized(from, msg.sender);
         _;
     }
 
@@ -166,12 +166,23 @@ contract IronBank is
         _checkAccountLiquidity(user);
     }
 
-    function supply(address user, address market, uint256 amount) external nonReentrant {
+    /**
+     * @notice Supply an amount of asset to Iron Bank.
+     * @param from The address which will supply the asset
+     * @param to The address which will hold the balance
+     * @param market The address of the market
+     * @param amount The amount of asset to supply
+     */
+    function supply(address from, address to, address market, uint256 amount)
+        external
+        nonReentrant
+        isAuthorized(from)
+    {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(!m.config.isFrozen, "frozen");
         require(!m.config.supplyPaused, "supply paused");
-        require(!isCreditAccount(user), "credit account cannot supply");
+        require(!isCreditAccount(to), "cannot supply to credit account");
 
         if (m.config.supplyCap != 0) {
             require(m.totalSupply + amount <= m.config.supplyCap, "supply cap reached");
@@ -186,19 +197,30 @@ contract IronBank is
         m.totalSupply += ibTokenAmount;
 
         // Update user supply balance.
-        m.userSupplies[user] += ibTokenAmount;
+        m.userSupplies[to] += ibTokenAmount;
 
-        if (m.userSupplies[user] > 0) {
-            _enterMarket(market, user);
+        if (m.userSupplies[to] > 0) {
+            _enterMarket(market, to);
         }
 
-        IBTokenInterface(m.config.ibTokenAddress).mint(user, ibTokenAmount);
-        IERC20(market).safeTransferFrom(msg.sender, address(this), amount);
+        IBTokenInterface(m.config.ibTokenAddress).mint(to, ibTokenAmount);
+        IERC20(market).safeTransferFrom(from, address(this), amount);
 
-        emit Supply(market, user, amount, ibTokenAmount);
+        emit Supply(market, from, to, amount, ibTokenAmount);
     }
 
-    function borrow(address user, address market, uint256 amount) external nonReentrant isAuthorized(user) {
+    /**
+     * @notice Borrow an amount of asset from Iron Bank.
+     * @param from The address which will borrow the asset
+     * @param to The address which will receive the token
+     * @param market The address of the market
+     * @param amount The amount of asset to borrow
+     */
+    function borrow(address from, address to, address market, uint256 amount)
+        external
+        nonReentrant
+        isAuthorized(from)
+    {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(!m.config.isFrozen, "frozen");
@@ -211,42 +233,54 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
-        uint256 newUserBorrowBalance = _getBorrowBalance(m, user) + amount;
+        uint256 newUserBorrowBalance = _getBorrowBalance(m, from) + amount;
 
         // Update internal cash and total borrow in pool.
         m.totalCash -= amount;
         m.totalBorrow += amount;
 
         // Update user borrow status.
-        m.userBorrows[user].borrowBalance = newUserBorrowBalance;
-        m.userBorrows[user].borrowIndex = m.borrowIndex;
+        m.userBorrows[from].borrowBalance = newUserBorrowBalance;
+        m.userBorrows[from].borrowIndex = m.borrowIndex;
 
         if (newUserBorrowBalance > 0) {
-            _enterMarket(market, user);
+            _enterMarket(market, from);
         }
 
-        IERC20(market).safeTransfer(msg.sender, amount);
+        IERC20(market).safeTransfer(to, amount);
 
-        if (isCreditAccount(user)) {
-            require(creditLimits[user][market] >= newUserBorrowBalance, "insufficient credit limit");
+        if (isCreditAccount(from)) {
+            require(from == to, "credit account can only borrow to itself");
+            require(creditLimits[from][market] >= newUserBorrowBalance, "insufficient credit limit");
         } else {
-            _checkAccountLiquidity(user);
+            _checkAccountLiquidity(from);
         }
 
-        emit Borrow(market, user, amount, newUserBorrowBalance, m.totalBorrow);
+        emit Borrow(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
     }
 
-    function redeem(address user, address market, uint256 amount) external nonReentrant isAuthorized(user) {
+    /**
+     * @notice Redeem an amount of asset from Iron Bank.
+     * @param from The address which will redeem the asset
+     * @param to The address which will receive the token
+     * @param market The address of the market
+     * @param amount The amount of asset to redeem
+     */
+    function redeem(address from, address to, address market, uint256 amount)
+        external
+        nonReentrant
+        isAuthorized(from)
+    {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(!m.config.isFrozen, "frozen");
-        require(!isCreditAccount(user), "credit account cannot redeem");
+        require(!isCreditAccount(from), "credit account cannot redeem");
 
         _accrueInterest(market, m);
 
         uint256 ibTokenAmount;
         if (amount == type(uint256).max) {
-            ibTokenAmount = m.userSupplies[user];
+            ibTokenAmount = m.userSupplies[from];
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
@@ -259,35 +293,42 @@ contract IronBank is
         m.totalSupply -= ibTokenAmount;
 
         // Update user supply balance.
-        m.userSupplies[user] -= ibTokenAmount;
+        m.userSupplies[from] -= ibTokenAmount;
 
-        if (m.userSupplies[user] == 0 && _getBorrowBalance(m, user) == 0) {
-            _exitMarket(market, user);
+        if (m.userSupplies[from] == 0 && _getBorrowBalance(m, from) == 0) {
+            _exitMarket(market, from);
         }
 
-        IBTokenInterface(m.config.ibTokenAddress).burn(user, ibTokenAmount);
-        IERC20(market).safeTransfer(msg.sender, amount);
+        IBTokenInterface(m.config.ibTokenAddress).burn(from, ibTokenAmount);
+        IERC20(market).safeTransfer(to, amount);
 
-        _checkAccountLiquidity(user);
+        _checkAccountLiquidity(from);
 
-        emit Redeem(market, user, amount, ibTokenAmount);
+        emit Redeem(market, from, to, amount, ibTokenAmount);
     }
 
-    function repay(address user, address market, uint256 amount) external nonReentrant {
+    /**
+     * @notice Repay an amount of asset to Iron Bank.
+     * @param from The address which will repay the asset
+     * @param to The address which will hold the balance
+     * @param market The address of the market
+     * @param amount The amount of asset to repay
+     */
+    function repay(address from, address to, address market, uint256 amount) external nonReentrant isAuthorized(from) {
         Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(!m.config.isFrozen, "frozen");
-        if (msg.sender != user) {
-            require(!isCreditAccount(user), "cannot repay for credit account");
+        if (isCreditAccount(to)) {
+            require(from == to, "credit account can only repay for itself");
         }
 
         _accrueInterest(market, m);
 
         uint256 newUserBorrowBalance;
         if (amount == type(uint256).max) {
-            amount = _getBorrowBalance(m, user);
+            amount = _getBorrowBalance(m, to);
         } else {
-            newUserBorrowBalance = _getBorrowBalance(m, user) - amount;
+            newUserBorrowBalance = _getBorrowBalance(m, to) - amount;
         }
 
         // Update internal cash and total borrow in pool.
@@ -295,16 +336,16 @@ contract IronBank is
         m.totalBorrow -= amount;
 
         // Update user borrow status.
-        m.userBorrows[user].borrowBalance = newUserBorrowBalance;
-        m.userBorrows[user].borrowIndex = m.borrowIndex;
+        m.userBorrows[to].borrowBalance = newUserBorrowBalance;
+        m.userBorrows[to].borrowIndex = m.borrowIndex;
 
-        if (m.userSupplies[user] == 0 && newUserBorrowBalance == 0) {
-            _exitMarket(market, user);
+        if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
+            _exitMarket(market, to);
         }
 
-        IERC20(market).safeTransferFrom(msg.sender, address(this), amount);
+        IERC20(market).safeTransferFrom(from, address(this), amount);
 
-        emit Repay(market, user, amount, newUserBorrowBalance, m.totalBorrow);
+        emit Repay(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
     }
 
     function liquidate(
@@ -538,8 +579,8 @@ contract IronBank is
         return uint40(block.timestamp);
     }
 
-    function _checkAuthorized(address user) internal view {
-        require(msg.sender == user || (!isCreditAccount(user) && isAllowedExtension(user, msg.sender)), "!authorized");
+    function _checkAuthorized(address from, address operator) internal view {
+        require(from == operator || (!isCreditAccount(from) && isAllowedExtension(from, operator)), "!authorized");
     }
 
     function _checkMarketConfigurator() internal view {

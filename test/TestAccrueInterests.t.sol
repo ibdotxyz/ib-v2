@@ -70,13 +70,13 @@ contract AccrueInterestTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(admin, address(market1), market1SupplyAmount);
+        ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.borrow(user1, address(market1), market1BorrowAmount);
+        ib.supply(user1, user1, address(market2), market2SupplyAmount);
+        ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         vm.stopPrank();
 
         (, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market1));
@@ -114,7 +114,7 @@ contract AccrueInterestTest is Test, Common {
 
         vm.startPrank(admin);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(admin, address(market1), supplyAmount);
+        ib.supply(admin, admin, address(market1), supplyAmount);
         vm.stopPrank();
 
         (, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market1));

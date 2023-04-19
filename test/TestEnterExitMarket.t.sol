@@ -71,13 +71,13 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, address(market2), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
 
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertTrue(ib.isEnteredMarket(user1, address(market2)));
@@ -95,19 +95,19 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, address(market2), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
 
         market2.approve(address(ib), type(uint256).max);
-        ib.repay(user1, address(market2), type(uint256).max);
+        ib.repay(user1, user1, address(market2), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market2)));
 
-        ib.redeem(user1, address(market1), type(uint256).max);
+        ib.redeem(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
     }
 
@@ -116,7 +116,7 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
 
         ibToken1.transfer(user2, ibToken1.balanceOf(user1));
@@ -131,15 +131,15 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, address(market2), market2BorrowAmount);
+        ib.supply(user2, user2, address(market2), market2BorrowAmount);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user2, address(market1), market1SupplyAmount);
+        ib.supply(user2, user2, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market2), market2BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market2)));
         vm.stopPrank();
 
@@ -157,17 +157,17 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market1), market1BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
 
-        ib.repay(user1, address(market1), type(uint256).max);
+        ib.repay(user1, user1, address(market1), type(uint256).max);
         // No borrow but has supply, so still the market is entered.
         assertTrue(ib.getSupplyBalance(user1, address(market1)) > 0);
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
 
-        ib.redeem(user1, address(market1), type(uint256).max);
+        ib.redeem(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
         vm.stopPrank();
     }
@@ -180,24 +180,24 @@ contract EnterExitMarketTest is Test, Common {
         vm.startPrank(admin);
         // Faucet some market1 for user1 to redeem full later.
         market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(admin, address(market1), market1SupplyAmount);
+        ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
-        ib.supply(user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, address(market1), market1BorrowAmount);
+        ib.supply(user1, user1, address(market1), market1SupplyAmount);
+        ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
 
         market2.approve(address(ib), market2SupplyAmount);
-        ib.supply(user1, address(market2), market2SupplyAmount);
-        ib.redeem(user1, address(market1), type(uint256).max);
+        ib.supply(user1, user1, address(market2), market2SupplyAmount);
+        ib.redeem(user1, user1, address(market1), type(uint256).max);
         // No supply but has borrow, so still the market is entered.
         assertEq(ib.getSupplyBalance(user1, address(market1)), 0);
         assertTrue(ib.getBorrowBalance(user1, address(market1)) > 0);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
 
-        ib.repay(user1, address(market1), type(uint256).max);
+        ib.repay(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
         vm.stopPrank();
     }

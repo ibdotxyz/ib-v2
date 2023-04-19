@@ -1,21 +1,302 @@
 # Iron Bank Extension
 
-Iron Bank extension is an external contract that provides multiple useful operations for user to manager their positions. It integrates Uniswap v2 and Uniswap v3. It also allows users to combine multiple operations into one transaction. The provided operations include:
+Iron Bank extension is an external contract that provides multiple useful operations for user to manager their positions. It integrates Uniswap v2 and Uniswap v3. It also allows users to combine multiple operations into one transaction. Any action needs to have two fields, name and data. For data, it needs to use `abi.encode` to serialize the data into bytes32. The provided operations include:
 
-- Supply Native Token: Help user wrap Ether into WETH and supply it into Iron Bank.
-- Borrow Native Token: Help user borrow WETH from Iron Bank and unwrap it to Ether.
-- Redeem Native Token: Help user redeem WETH from Iron Bank and unwrap it to Ether.
-- Repay Native Token: Help user wrap Ether into WETH and repay it into Iron Bank. If user repays more than borrow balance, the excessive amount will return to user.
-- Add collateral: Help user supply asset and enter market. Need to be careful for the collateral cap.
-- Borrow: Help user borrow asset.
-- Leverage Long Through Uniswap v3: Help user leverage long an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
-- Leverage Short Through Uniswap v3: Help user leverage short an asset against another asset thorough Uniswap v3. Need to be careful for the collateral cap.
-- Swap Debt Through Uniswap v3: Help user swap debt through Uniswap v3.
-- Swap Collateral Thorugh Uniswap v3: Help user swap collateral through Uniswap v3. Need to be careful for the collateral cap.
-- Leverage Long Through Uniswap v2: Help user leverage long an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
-- Leverage Short Through Uniswap v2: Help user leverage short an asset against another asset thorough Uniswap v2. Need to be careful for the collateral cap.
-- Swap Debt Through Uniswap v2: Help user swap debt through Uniswap v2.
-- Swap Collateral Thorugh Uniswap v2: Help user swap collateral through Uniswap v2. Need to be careful for the collateral cap.
+### Supply Native Token
+
+Help user wrap Ether into WETH and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_NATIVE_TOKEN`
+
+Action data: None, but `msg.value` should be the supply amount.
+
+### Borrow Native Token
+
+Help user borrow WETH from Iron Bank and unwrap it to Ether.
+
+Action name: `ACTION_BORROW_NATIVE_TOKEN`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the borrow amount |
+
+### Redeem Native Token
+
+Help user redeem WETH from Iron Bank and unwrap it to Ether.
+
+Action name: `ACTION_REDEEM_NATIVE_TOKEN`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the redeem amount |
+
+### Repay Native Token
+
+Help user wrap Ether into WETH and repay it into Iron Bank. If user repays more than borrow balance, the excessive amount will return to user.
+
+Action name: `ACTION_REPAY_NATIVE_TOKEN`
+
+Action data: None, but `msg.value` should be the repay amount.
+
+### Supply
+
+Help user supply asset.
+
+Action name: `ACTION_SUPPLY`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the supply asset |
+| uint256 | the supply amount |
+
+### Borrow
+
+Help user borrow asset.
+
+Action name: `ACTION_BORROW`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the borrow asset |
+| uint256 | the borrow amount |
+
+### Redeem
+
+Help user redeem asset.
+
+Action name: `ACTION_REDEEM`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the redeem asset |
+| uint256 | the redeem amount, -1 will redeem full |
+
+### Repay
+
+Help user repay asset.
+
+Action name: `ACTION_REPAY`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the repay asset |
+| uint256 | the repay amount, -1 will repay full |
+
+### Leverage Long Through Uniswap v3
+
+Help user leverage long an asset against another asset thorough Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the long asset |
+| uint256 | the long amount |
+| address | the short asset |
+| uint256 | the max short amount |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_OPEN_LONG_POSITION` |
+| uint256 | the deadline of this action |
+
+### Close Long Position Through Uniswap v3
+
+Help user close long position against another asset thorough Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the long asset |
+| uint256 | the amount to close long, -1 will redeem full |
+| address | the short asset |
+| uint256 | the min amount to close short |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_CLOSE_LONG_POSITION` |
+| uint256 | the deadline of this action |
+
+### Leverage Short Through Uniswap v3:
+
+Help user leverage short an asset against another asset thorough Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the short asset |
+| uint256 | the short amount |
+| address | the long asset |
+| uint256 | the min long amount |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_OPEN_SHORT_POSITION` |
+| uint256 | the deadline of this action |
+
+### Close Short Position Through Uniswap v3:
+
+Help user close short position against another asset thorough Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the short asset |
+| uint256 | the amount to close short, -1 will repay full |
+| address | the long asset |
+| uint256 | the min amount to close long |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_CLOSE_SHORT_POSITION` |
+| uint256 | the deadline of this action |
+
+### Swap Debt Through Uniswap v3
+
+Help user swap debt through Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the source borrow asset |
+| uint256 | the source borrow amount, -1 will swap full |
+| address | the destination borrow asset |
+| uint256 | the max destination borrow amount |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_SWAP_DEBT` |
+| uint256 | the deadline of this action |
+
+### Swap Collateral Thorugh Uniswap v3
+
+Help user swap collateral through Uniswap v3.
+
+Action name: `ACTION_UNISWAP_V3_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the source supply asset |
+| uint256 | the source supply amount, -1 will swap full |
+| address | the destination supply asset |
+| uint256 | the min destination supply amount |
+| address[] | the Uniswap v3 path |
+| uint24[] | the Uniswap v3 fees |
+| bytes32 | `SUB_ACTION_SWAP_COLLATERAL` |
+| uint256 | the deadline of this action |
+
+### Leverage Long Through Uniswap v2
+
+Help user leverage long an asset against another asset thorough Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the long asset |
+| uint256 | the long amount |
+| address | the short asset |
+| uint256 | the max short amount |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_OPEN_LONG_POSITION` |
+| uint256 | the deadline of this action |
+
+### Close Long Position Through Uniswap v2
+
+Help user close long position against another asset thorough Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the long asset |
+| uint256 | the amount to close long, -1 will redeem full |
+| address | the short asset |
+| uint256 | the min amount to close short |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_CLOSE_LONG_POSITION` |
+| uint256 | the deadline of this action |
+
+### Leverage Short Through Uniswap v2:
+
+Help user leverage short an asset against another asset thorough Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the short asset |
+| uint256 | the short amount |
+| address | the long asset |
+| uint256 | the min long amount |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_OPEN_SHORT_POSITION` |
+| uint256 | the deadline of this action |
+
+### Close Short Position Through Uniswap v2:
+
+Help user close short position against another asset thorough Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the short asset |
+| uint256 | the amount to close short, -1 will repay full |
+| address | the long asset |
+| uint256 | the min amount to close long |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_CLOSE_SHORT_POSITION` |
+| uint256 | the deadline of this action |
+
+### Swap Debt Through Uniswap v2
+
+Help user swap debt through Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_OUTPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the source borrow asset |
+| uint256 | the source borrow amount, -1 will swap full |
+| address | the destination borrow asset |
+| uint256 | the max destination borrow amount |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_SWAP_DEBT` |
+| uint256 | the deadline of this action |
+
+### Swap Collateral Thorugh Uniswap v2
+
+Help user swap collateral through Uniswap v2.
+
+Action name: `ACTION_UNISWAP_V2_EXACT_INPUT`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the source supply asset |
+| uint256 | the source supply amount, -1 will swap full |
+| address | the destination supply asset |
+| uint256 | the min destination supply amount |
+| address[] | the Uniswap v2 path |
+| bytes32 | `SUB_ACTION_SWAP_COLLATERAL` |
+| uint256 | the deadline of this action |
 
 ## Techinical Explanation
 

@@ -61,18 +61,61 @@ contract RedeemTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
 
         fastForwardTime(86400);
 
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
         vm.stopPrank();
 
+        assertEq(market1.balanceOf(user1), 9950e18); // 10000 - 100 + 50
         assertEq(ibToken1.balanceOf(user1), 50e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50e18);
-        assertEq(market1.balanceOf(user1), 9950e18);
+    }
+
+    function testRedeemToOther() public {
+        uint256 supplyAmount = 100e18;
+        uint256 redeemAmount = 50e18;
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+
+        fastForwardTime(86400);
+
+        ib.redeem(user1, user2, address(market1), redeemAmount);
+        vm.stopPrank();
+
+        assertEq(market1.balanceOf(user1), 9900e18); // 10000 - 100
+        assertEq(market1.balanceOf(user2), redeemAmount);
+        assertEq(ibToken1.balanceOf(user1), 50e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertEq(ibToken1.totalSupply(), 50e18);
+    }
+
+    function testRedeemOnBehalf() public {
+        uint256 supplyAmount = 100e18;
+        uint256 redeemAmount = 50e18;
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        ib.setUserExtension(user2, true);
+        vm.stopPrank();
+
+        fastForwardTime(86400);
+
+        vm.prank(user2);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
+
+        assertEq(market1.balanceOf(user1), 9950e18); // 10000 - 100 + 50
+        assertEq(ibToken1.balanceOf(user1), 50e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertEq(ibToken1.totalSupply(), 50e18);
     }
 
     function testRedeemWithInterests() public {
@@ -81,19 +124,19 @@ contract RedeemTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(admin);
         market2.approve(address(ib), 10000e18);
-        ib.supply(admin, address(market2), 10000e18);
-        ib.borrow(admin, address(market1), 30e18);
+        ib.supply(admin, admin, address(market2), 10000e18);
+        ib.borrow(admin, admin, address(market1), 30e18);
         vm.stopPrank();
 
         fastForwardTime(86400);
 
         vm.prank(user1);
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
 
         /**
          * utilization = 30 / 100 = 30% < kink1 = 80%
@@ -115,13 +158,13 @@ contract RedeemTest is Test, Common {
         // Admin repays the debt for user1 to redeem.
         vm.startPrank(admin);
         market1.approve(address(ib), type(uint256).max);
-        ib.repay(admin, address(market1), type(uint256).max);
+        ib.repay(admin, admin, address(market1), type(uint256).max);
         vm.stopPrank();
 
         fastForwardTime(86400);
 
         vm.prank(user1);
-        ib.redeem(user1, address(market1), type(uint256).max);
+        ib.redeem(user1, user1, address(market1), type(uint256).max);
 
         assertEq(ibToken1.balanceOf(user1), 0);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 0);
@@ -135,7 +178,7 @@ contract RedeemTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("!authorized");
-        ib.redeem(user2, address(market1), redeemAmount);
+        ib.redeem(user2, user2, address(market1), redeemAmount);
     }
 
     function testCannotRedeemForMarketNotListed() public {
@@ -145,7 +188,7 @@ contract RedeemTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.redeem(user1, address(invalidMarket), redeemAmount);
+        ib.redeem(user1, user1, address(invalidMarket), redeemAmount);
     }
 
     function testCannotRedeemForMarketFrozen() public {
@@ -156,7 +199,7 @@ contract RedeemTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("frozen");
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
     }
 
     function testCannotRedeemForCreditAccount() public {
@@ -167,7 +210,7 @@ contract RedeemTest is Test, Common {
 
         vm.prank(user1);
         vm.expectRevert("credit account cannot redeem");
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
     }
 
     function testCannotRedeemForInsufficientCash() public {
@@ -176,18 +219,18 @@ contract RedeemTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(admin);
         market2.approve(address(ib), 10000e18);
-        ib.supply(admin, address(market2), 10000e18);
-        ib.borrow(admin, address(market1), 50e18);
+        ib.supply(admin, admin, address(market2), 10000e18);
+        ib.borrow(admin, admin, address(market1), 50e18);
         vm.stopPrank();
 
         vm.prank(user1);
         vm.expectRevert("insufficient cash");
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
     }
 
     function testCannotRedeemForInsufficientCollateral() public {
@@ -196,13 +239,13 @@ contract RedeemTest is Test, Common {
 
         vm.startPrank(admin);
         market2.approve(address(ib), 10000e18);
-        ib.supply(admin, address(market2), 10000e18);
+        ib.supply(admin, admin, address(market2), 10000e18);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
-        ib.supply(user1, address(market1), supplyAmount);
-        ib.borrow(user1, address(market2), 100e18);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        ib.borrow(user1, user1, address(market2), 100e18);
         vm.stopPrank();
 
         /**
@@ -211,6 +254,6 @@ contract RedeemTest is Test, Common {
          */
         vm.prank(user1);
         vm.expectRevert("insufficient collateral");
-        ib.redeem(user1, address(market1), redeemAmount);
+        ib.redeem(user1, user1, address(market1), redeemAmount);
     }
 }
