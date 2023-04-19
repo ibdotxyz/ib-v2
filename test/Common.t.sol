@@ -193,6 +193,14 @@ abstract contract Common is Test {
         vm.stopPrank();
     }
 
+    function setPriceToRegistry(FeedRegistry registry, address admin, address base, address quote, int256 price)
+        internal
+    {
+        vm.startPrank(admin);
+        registry.setAnswer(base, quote, price);
+        vm.stopPrank();
+    }
+
     function createExtension(
         address _admin,
         IronBank _ironBank,

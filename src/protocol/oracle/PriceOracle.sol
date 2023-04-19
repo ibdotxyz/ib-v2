@@ -9,6 +9,7 @@ import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.s
 import "../../interfaces/PriceOracleInterface.sol";
 
 contract PriceOracle is Ownable2Step, PriceOracleInterface {
+    /// @notice The Chainlink feed registry
     FeedRegistryInterface public immutable registry;
 
     struct AggregatorInfo {
@@ -16,14 +17,19 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
         address quote;
     }
 
+    /// @notice The mapping from asset to aggregator
     mapping(address => AggregatorInfo) public aggregators;
-
-    string public constant QUOTE_SYMBOL = "USD";
 
     constructor(address registry_) {
         registry = FeedRegistryInterface(registry_);
     }
 
+    /**
+     * @notice Get the price of an asset in USD
+     * @dev The price returned will be normalized by asset's decimals.
+     * @param asset The asset to get the price of
+     * @return The price of the asset in USD
+     */
     function getPrice(address asset) external view returns (uint256) {
         AggregatorInfo memory aggregatorInfo = aggregators[asset];
         uint256 price = getPriceFromChainlink(aggregatorInfo.base, aggregatorInfo.quote);
@@ -36,6 +42,12 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
         return price * 10 ** (18 - decimals);
     }
 
+    /**
+     * @notice Get price from Chainlink
+     * @param base The base asset
+     * @param quote The quote asset
+     * @return The price
+     */
     function getPriceFromChainlink(address base, address quote) internal view returns (uint256) {
         (, int256 price,,,) = registry.latestRoundData(base, quote);
         require(price > 0, "invalid price");
@@ -52,6 +64,10 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
         address quote;
     }
 
+    /**
+     * @notice Set the aggregators
+     * @param aggrs The aggregators
+     */
     function _setAggregators(Aggregator[] calldata aggrs) external onlyOwner {
         uint256 length = aggrs.length;
         for (uint256 i = 0; i < length;) {
