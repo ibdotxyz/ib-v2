@@ -275,7 +275,7 @@ contract BorrowTest is Test, Common {
         uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
 
         vm.prank(admin);
-        configurator.setBorrowPaused(address(market2), true);
+        configurator.setMarketBorrowPaused(address(market2), true);
 
         vm.prank(user1);
         vm.expectRevert("borrow paused");

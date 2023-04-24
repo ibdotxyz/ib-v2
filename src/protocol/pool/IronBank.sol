@@ -142,6 +142,10 @@ contract IronBank is
         return markets[market].config.debtTokenAddress;
     }
 
+    function getPTokenAddress(address market) public view returns (address) {
+        return markets[market].config.pTokenAddress;
+    }
+
     function calculateLiquidationOpportunity(address marketBorrow, address marketCollateral, uint256 repayAmount)
         public
         view
@@ -477,8 +481,6 @@ contract IronBank is
         m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
         allMarkets.push(market);
-
-        emit MarketListed(market);
     }
 
     function delistMarket(address market) external onlyMarketConfigurator {
@@ -487,8 +489,6 @@ contract IronBank is
 
         delete markets[market];
         allMarkets.deleteElement(market);
-
-        emit MarketDelisted(market);
     }
 
     function setMarketConfiguration(address market, MarketConfig calldata config) external onlyMarketConfigurator {
@@ -496,8 +496,6 @@ contract IronBank is
         require(m.config.isListed, "not listed");
 
         m.config = config;
-
-        emit MarketConfigurationSet(market, config);
     }
 
     function setCreditLimit(address user, address market, uint256 credit) external onlyCreditLimitManager {

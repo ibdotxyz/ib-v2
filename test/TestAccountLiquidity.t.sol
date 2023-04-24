@@ -122,6 +122,7 @@ contract AccountLiquidityTest is Test, Common {
 
         vm.startPrank(admin);
         configurator.softDelistMarket(address(market2));
+        configurator.adjustMarketCollateralFactor(address(market2), 0);
         configurator.hardDelistMarket(address(market2));
 
         /**
