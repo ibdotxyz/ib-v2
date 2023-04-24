@@ -8,13 +8,26 @@ import "./Constants.sol";
 import "./IronBankStorage.sol";
 import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
+import "../../interfaces/PTokenInterface.sol";
 
 contract MarketConfigurator is Ownable2Step, Constants {
-    address private immutable _pool;
+    /// @notice The Iron Bank contract
+    IronBankInterface public immutable ironBank;
 
-    address private _guardian;
+    /// @notice The address of the guardian
+    address public guardian;
 
     event GuardianSet(address guardian);
+    event MarketListed(
+        address market,
+        address ibToken,
+        address debtToken,
+        address interestRateModel,
+        uint16 reserveFactor,
+        bool isPToken,
+        address pToken
+    );
+    event MarketDelisted(address market);
     event MarketCollateralFactorSet(address market, uint16 collateralFactor);
     event MarketLiquidationThresholdSet(address market, uint16 liquidationThreshold);
     event MarketLiquidationBonusSet(address market, uint16 liquidationBonus);
@@ -24,11 +37,15 @@ contract MarketConfigurator is Ownable2Step, Constants {
     event MarketBorrowCapSet(address market, uint256 cap);
     event MarketPausedSet(address market, string action, bool paused);
     event MarketFrozen(address market, bool state);
+    event MarketPTokenSet(address market, address pToken);
 
-    constructor(address pool_) {
-        _pool = pool_;
+    constructor(address ironBank_) {
+        ironBank = IronBankInterface(ironBank_);
     }
 
+    /**
+     * @notice Check if the caller is the owner or the guardian.
+     */
     modifier onlyOwnerOrGuardian() {
         _checkOwnerOrGuardian();
         _;
@@ -36,41 +53,73 @@ contract MarketConfigurator is Ownable2Step, Constants {
 
     /* ========== VIEW FUNCTIONS ========== */
 
-    function getPool() external view returns (address) {
-        return _pool;
-    }
-
-    function getGuardian() external view returns (address) {
-        return _guardian;
-    }
-
+    /**
+     * @notice Get the market configuration of a market.
+     * @return The market configuration
+     */
     function getMarketConfiguration(address market) public view returns (IronBankStorage.MarketConfig memory) {
-        return IronBankInterface(_pool).getMarketConfiguration(market);
+        return ironBank.getMarketConfiguration(market);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function setGuardian(address guardian) external onlyOwner {
-        _guardian = guardian;
+    /**
+     * @notice Set the guardian of market configurator.
+     * @param _guardian The address of the guardian
+     */
+    function setGuardian(address _guardian) external onlyOwner {
+        guardian = _guardian;
 
         emit GuardianSet(guardian);
     }
 
+    /**
+     * @notice List a market to Iron Bank.
+     * @dev The market could be either a pToken or have a pToken.
+     * @param market The market to be listed
+     * @param ibTokenAddress The address of the ibToken
+     * @param debtTokenAddress The address of the debtToken
+     * @param interestRateModelAddress The address of the interest rate model
+     * @param reserveFactor The reserve factor of the market
+     * @param isPToken Whether the market is a pToken
+     * @param pTokenAddress The address of the market's pToken if it exists
+     */
     function listMarket(
         address market,
         address ibTokenAddress,
         address debtTokenAddress,
         address interestRateModelAddress,
-        uint16 reserveFactor
+        uint16 reserveFactor,
+        bool isPToken,
+        address pTokenAddress
     ) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
         require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
         require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
+        require(!isPToken || pTokenAddress == address(0), "invalid parameter");
 
         uint8 underlyingDecimals = IERC20Metadata(market).decimals();
         require(underlyingDecimals <= 18, "nonstandard token decimals");
+
+        if (isPToken) {
+            address underlying = PTokenInterface(market).getUnderlying();
+            IronBankStorage.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
+            // It's possible that the underlying is not listed.
+            if (underlyingConfig.isListed) {
+                require(underlyingConfig.pTokenAddress == address(0), "underlying already has pToken");
+
+                underlyingConfig.pTokenAddress = market;
+                ironBank.setMarketConfiguration(underlying, underlyingConfig);
+
+                emit MarketPTokenSet(underlying, market);
+            }
+        } else if (pTokenAddress != address(0)) {
+            // If the market's pToken is provided, it must match the market and be listed.
+            require(PTokenInterface(pTokenAddress).getUnderlying() == market, "mismatch pToken");
+            require(ironBank.isMarketListed(pTokenAddress), "pToken not listed");
+        }
 
         config.isListed = true;
         config.ibTokenAddress = ibTokenAddress;
@@ -78,10 +127,29 @@ contract MarketConfigurator is Ownable2Step, Constants {
         config.interestRateModelAddress = interestRateModelAddress;
         config.reserveFactor = reserveFactor;
         config.initialExchangeRate = 10 ** underlyingDecimals;
+        if (isPToken) {
+            config.isPToken = true;
+            config.borrowPaused = true;
+            // Set the borrow cap to a very small amount (1 Wei) to prevent borrowing.
+            config.borrowCap = 1;
+        } else if (pTokenAddress != address(0)) {
+            config.pTokenAddress = pTokenAddress;
+        }
 
-        IronBankInterface(_pool).listMarket(market, config);
+        ironBank.listMarket(market, config);
+
+        emit MarketListed(
+            market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, isPToken, pTokenAddress
+            );
     }
 
+    /**
+     * @notice Configure a market as collateral.
+     * @param market The market to be configured
+     * @param collateralFactor The collateral factor of the market
+     * @param liquidationThreshold The liquidation threshold of the market
+     * @param liquidationBonus The liquidation bonus of the market
+     */
     function configureMarketAsCollateral(
         address market,
         uint16 collateralFactor,
@@ -103,36 +171,54 @@ contract MarketConfigurator is Ownable2Step, Constants {
         config.collateralFactor = collateralFactor;
         config.liquidationThreshold = liquidationThreshold;
         config.liquidationBonus = liquidationBonus;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketCollateralFactorSet(market, collateralFactor);
         emit MarketLiquidationThresholdSet(market, liquidationThreshold);
         emit MarketLiquidationBonusSet(market, liquidationBonus);
     }
 
+    /**
+     * @notice Adjust the collateral factor of a market.
+     * @param market The market to be adjusted
+     * @param collateralFactor The new collateral factor of the market
+     */
     function adjustMarketCollateralFactor(address market, uint16 collateralFactor) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
         require(collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
 
         config.collateralFactor = collateralFactor;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketCollateralFactorSet(market, collateralFactor);
     }
 
+    /**
+     * @notice Adjust the reserve factor of a market.
+     * @param market The market to be adjusted
+     * @param reserveFactor The new reserve factor of the market
+     */
     function adjustMarketReserveFactor(address market, uint16 reserveFactor) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
+        // Accrue interests before changing IRM.
+        ironBank.accrueInterest(market);
+
         config.reserveFactor = reserveFactor;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketReserveFactorSet(market, reserveFactor);
     }
 
-    function adjustLiquidationThreshold(address market, uint16 liquidationThreshold) external onlyOwner {
+    /**
+     * @notice Adjust the liquidation threshold of a market.
+     * @param market The market to be adjusted
+     * @param liquidationThreshold The new liquidation threshold of the market
+     */
+    function adjustMarketLiquidationThreshold(address market, uint16 liquidationThreshold) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
         require(
@@ -141,12 +227,17 @@ contract MarketConfigurator is Ownable2Step, Constants {
         );
 
         config.liquidationThreshold = liquidationThreshold;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketLiquidationThresholdSet(market, liquidationThreshold);
     }
 
-    function adjustLiquidationBonus(address market, uint16 liquidationBonus) external onlyOwner {
+    /**
+     * @notice Adjust the liquidation bonus of a market.
+     * @param market The market to be adjusted
+     * @param liquidationBonus The new liquidation bonus of the market
+     */
+    function adjustMarketLiquidationBonus(address market, uint16 liquidationBonus) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
         require(
@@ -155,34 +246,49 @@ contract MarketConfigurator is Ownable2Step, Constants {
         );
 
         config.liquidationBonus = liquidationBonus;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketLiquidationBonusSet(market, liquidationBonus);
     }
 
+    /**
+     * @notice Change the interest rate model of a market.
+     * @param market The market to be changed
+     * @param interestRateModelAddress The new interest rate model of the market
+     */
     function changeMarketInterestRateModel(address market, address interestRateModelAddress) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
 
         // Accrue interests before changing IRM.
-        IronBankInterface(_pool).accrueInterest(market);
+        ironBank.accrueInterest(market);
 
         config.interestRateModelAddress = interestRateModelAddress;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketInterestRateModelSet(market, interestRateModelAddress);
     }
 
+    /**
+     * @notice Freeze a market.
+     * @param market The market to be frozen
+     * @param state Freeze or unfreeze
+     */
     function freezeMarket(address market, bool state) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
 
         config.isFrozen = state;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketFrozen(market, state);
     }
 
+    /**
+     * @notice Soft delist a market.
+     * @dev Soft delisting a market means that the supply and borrow will be paused and the reserve factor will be set to 100%.
+     * @param market The market to be soft delisted
+     */
     function softDelistMarket(address market) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
@@ -199,13 +305,13 @@ contract MarketConfigurator is Ownable2Step, Constants {
             config.reserveFactor = MAX_RESERVE_FACTOR;
             emit MarketReserveFactorSet(market, MAX_RESERVE_FACTOR);
         }
-        if (config.collateralFactor != 0) {
-            config.collateralFactor = 0;
-            emit MarketCollateralFactorSet(market, 0);
-        }
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
     }
 
+    /**
+     * @notice Hard delist a market.
+     * @param market The market to be hard delisted
+     */
     function hardDelistMarket(address market) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
@@ -213,7 +319,21 @@ contract MarketConfigurator is Ownable2Step, Constants {
         require(config.reserveFactor == MAX_RESERVE_FACTOR, "reserve factor not max");
         require(config.collateralFactor == 0, "collateral factor not zero");
 
-        IronBankInterface(_pool).delistMarket(market);
+        if (config.isPToken) {
+            address underlying = PTokenInterface(market).getUnderlying();
+            IronBankStorage.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
+            // It's possible that the underlying is not listed.
+            if (underlyingConfig.isListed && underlyingConfig.pTokenAddress != address(0)) {
+                underlyingConfig.pTokenAddress = address(0);
+                ironBank.setMarketConfiguration(underlying, underlyingConfig);
+
+                emit MarketPTokenSet(underlying, address(0));
+            }
+        }
+
+        ironBank.delistMarket(market);
+
+        emit MarketDelisted(market);
     }
 
     struct MarketCap {
@@ -221,6 +341,10 @@ contract MarketConfigurator is Ownable2Step, Constants {
         uint256 cap;
     }
 
+    /**
+     * @notice Set the supply cap of a list of markets.
+     * @param marketCaps The list of markets and their supply caps
+     */
     function setMarketSupplyCaps(MarketCap[] calldata marketCaps) external onlyOwnerOrGuardian {
         uint256 length = marketCaps.length;
         for (uint256 i = 0; i < length;) {
@@ -230,7 +354,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
             require(config.isListed, "not listed");
 
             config.supplyCap = cap;
-            IronBankInterface(_pool).setMarketConfiguration(market, config);
+            ironBank.setMarketConfiguration(market, config);
 
             emit MarketSupplyCapSet(market, cap);
 
@@ -240,6 +364,10 @@ contract MarketConfigurator is Ownable2Step, Constants {
         }
     }
 
+    /**
+     * @notice Set the borrow cap of a list of markets.
+     * @param marketCaps The list of markets and their borrow caps
+     */
     function setMarketBorrowCaps(MarketCap[] calldata marketCaps) external onlyOwnerOrGuardian {
         uint256 length = marketCaps.length;
         for (uint256 i = 0; i < length;) {
@@ -247,9 +375,10 @@ contract MarketConfigurator is Ownable2Step, Constants {
             uint256 cap = marketCaps[i].cap;
             IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
             require(config.isListed, "not listed");
+            require(!config.isPToken, "cannot set borrow cap for pToken");
 
             config.borrowCap = cap;
-            IronBankInterface(_pool).setMarketConfiguration(market, config);
+            ironBank.setMarketConfiguration(market, config);
 
             emit MarketBorrowCapSet(market, cap);
 
@@ -259,29 +388,63 @@ contract MarketConfigurator is Ownable2Step, Constants {
         }
     }
 
-    function setSupplyPaused(address market, bool paused) external onlyOwnerOrGuardian {
+    /**
+     * @notice Pause or unpause the supply of a market.
+     * @param market The market to be paused or unpaused
+     * @param paused Pause or unpause
+     */
+    function setMarketSupplyPaused(address market, bool paused) external onlyOwnerOrGuardian {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
 
         config.supplyPaused = paused;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketPausedSet(market, "supply", paused);
     }
 
-    function setBorrowPaused(address market, bool paused) external onlyOwnerOrGuardian {
+    /**
+     * @notice Pause or unpause the borrow of a market.
+     * @param market The market to be paused or unpaused
+     * @param paused Pause or unpause
+     */
+    function setMarketBorrowPaused(address market, bool paused) external onlyOwnerOrGuardian {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
+        require(!config.isPToken, "cannot unpause borrow for pToken");
 
         config.borrowPaused = paused;
-        IronBankInterface(_pool).setMarketConfiguration(market, config);
+        ironBank.setMarketConfiguration(market, config);
 
         emit MarketPausedSet(market, "borrow", paused);
     }
 
+    /**
+     * @notice Set the pToken of a market.
+     * @dev This function can be called when the pToken address is not set when the market is listed.
+     * @param market The market to be set
+     * @param pToken The pToken of the market
+     */
+    function setMarketPToken(address market, address pToken) external onlyOwnerOrGuardian {
+        require(PTokenInterface(pToken).getUnderlying() == market, "mismatch pToken");
+        require(ironBank.isMarketListed(pToken), "pToken not listed");
+
+        IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
+        require(config.isListed, "not listed");
+        require(config.pTokenAddress == address(0), "pToken already set");
+
+        config.pTokenAddress = pToken;
+        ironBank.setMarketConfiguration(market, config);
+
+        emit MarketPTokenSet(market, pToken);
+    }
+
     /* ========== INTERNAL FUNCTIONS ========== */
 
+    /**
+     * @dev Check if the caller is the owner or guardian.
+     */
     function _checkOwnerOrGuardian() internal view {
-        require(msg.sender == owner() || msg.sender == _guardian, "unauthorized");
+        require(msg.sender == owner() || msg.sender == guardian, "!authorized");
     }
 }

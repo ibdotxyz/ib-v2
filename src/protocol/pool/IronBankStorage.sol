@@ -5,12 +5,6 @@ pragma solidity ^0.8.0;
 import "./Constants.sol";
 
 contract IronBankStorage is Constants {
-    event MarketListed(address market);
-
-    event MarketDelisted(address market);
-
-    event MarketConfigurationSet(address market, MarketConfig config);
-
     event MarketConfiguratorSet(address configurator);
 
     event CreditLimitManagerSet(address manager);
@@ -84,10 +78,12 @@ contract IronBankStorage is Constants {
         // 20 + 20 + 20 + 32 + 32 + 32
         address ibTokenAddress;
         address debtTokenAddress;
+        address pTokenAddress;
         address interestRateModelAddress;
         uint256 supplyCap;
         uint256 borrowCap;
         uint256 initialExchangeRate;
+        bool isPToken;
     }
 
     struct Market {
