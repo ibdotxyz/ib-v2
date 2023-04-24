@@ -410,13 +410,10 @@ contract MarketConfiguratorTest is Test, Common {
 
         PToken pToken = createPToken(admin, address(market2));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         // List the pToken first.
         vm.startPrank(admin);
-        configurator.listPTokenMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         // List the underlying of the pToken.
         configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
@@ -477,13 +474,10 @@ contract MarketConfiguratorTest is Test, Common {
 
         PToken pToken = createPToken(admin, address(market2));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         // List the pToken first.
         vm.startPrank(admin);
-        configurator.listPTokenMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         // List the underlying of the pToken.
         configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);

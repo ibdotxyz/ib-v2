@@ -95,18 +95,16 @@ contract MarketConfigurator is Ownable2Step, Constants {
      * @notice List a pToken market to Iron Bank.
      * @param market The market to be listed
      * @param ibTokenAddress The address of the ibToken
-     * @param debtTokenAddress The address of the debtToken
      * @param interestRateModelAddress The address of the interest rate model
      * @param reserveFactor The reserve factor of the market
      */
     function listPTokenMarket(
         address market,
         address ibTokenAddress,
-        address debtTokenAddress,
         address interestRateModelAddress,
         uint16 reserveFactor
     ) external onlyOwner {
-        _listMarket(market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, true);
+        _listMarket(market, ibTokenAddress, address(0), interestRateModelAddress, reserveFactor, true);
     }
 
     /**
@@ -438,7 +436,6 @@ contract MarketConfigurator is Ownable2Step, Constants {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
         require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
-        require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
         uint8 underlyingDecimals = IERC20Metadata(market).decimals();
@@ -456,11 +453,12 @@ contract MarketConfigurator is Ownable2Step, Constants {
 
                 emit MarketPTokenSet(underlying, market);
             }
+        } else {
+            require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
         }
 
         config.isListed = true;
         config.ibTokenAddress = ibTokenAddress;
-        config.debtTokenAddress = debtTokenAddress;
         config.interestRateModelAddress = interestRateModelAddress;
         config.reserveFactor = reserveFactor;
         config.initialExchangeRate = 10 ** underlyingDecimals;
@@ -469,6 +467,8 @@ contract MarketConfigurator is Ownable2Step, Constants {
             config.borrowPaused = true;
             // Set the borrow cap to a very small amount (1 Wei) to prevent borrowing.
             config.borrowCap = 1;
+        } else {
+            config.debtTokenAddress = debtTokenAddress;
         }
 
         ironBank.listMarket(market, config);

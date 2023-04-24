@@ -34,7 +34,6 @@ contract ListDelistTest is Test, Common {
 
         PToken pToken = createPToken(admin, address(market));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.prank(admin);
         configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
@@ -54,9 +53,7 @@ contract ListDelistTest is Test, Common {
 
         // List a pToken of this market.
         vm.prank(admin);
-        configurator.listPTokenMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         // Update the pToken.
         config = ib.getMarketConfiguration(address(market));
@@ -65,7 +62,7 @@ contract ListDelistTest is Test, Common {
         config = ib.getMarketConfiguration(address(pToken));
         assertTrue(config.isListed);
         assertEq(config.ibTokenAddress, address(ibToken2));
-        assertEq(config.debtTokenAddress, address(debtToken2));
+        assertEq(config.debtTokenAddress, address(0));
         assertEq(config.interestRateModelAddress, address(irm));
         assertEq(config.reserveFactor, reserveFactor);
         assertTrue(config.isPToken);
@@ -84,18 +81,15 @@ contract ListDelistTest is Test, Common {
 
         PToken pToken = createPToken(admin, address(market));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         // List the pToken first.
         vm.prank(admin);
-        configurator.listPTokenMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
         assertTrue(config.isListed);
         assertEq(config.ibTokenAddress, address(ibToken2));
-        assertEq(config.debtTokenAddress, address(debtToken2));
+        assertEq(config.debtTokenAddress, address(0));
         assertEq(config.interestRateModelAddress, address(irm));
         assertEq(config.reserveFactor, reserveFactor);
         assertTrue(config.isPToken);
@@ -194,22 +188,16 @@ contract ListDelistTest is Test, Common {
 
         PToken pToken = createPToken(admin, address(market));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.startPrank(admin);
         configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
-        configurator.listPTokenMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         PToken pToken2 = createPToken(admin, address(market));
         IBToken ibToken3 = createIBToken(admin, address(ib), address(pToken2));
-        DebtToken debtToken3 = createDebtToken(admin, address(ib), address(pToken2));
 
         vm.expectRevert("underlying already has pToken");
-        configurator.listPTokenMarket(
-            address(pToken2), address(ibToken3), address(debtToken3), address(irm), reserveFactor
-        );
+        configurator.listPTokenMarket(address(pToken2), address(ibToken3), address(irm), reserveFactor);
         vm.stopPrank();
     }
 
