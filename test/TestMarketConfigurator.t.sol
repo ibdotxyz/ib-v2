@@ -33,9 +33,7 @@ contract MarketConfiguratorTest is Test, Common {
         uint16 reserveFactor = 1500; // 15%
 
         vm.prank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
     function testSetGuardian() public {
@@ -93,6 +91,23 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.configureMarketAsCollateral(
             address(notListedMarket), collateralFactor, liquidationThreshold, liquidationBonus
         );
+    }
+
+    function testCannotConfigureMarketAsCollateralForAlreadyConfigured() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.startPrank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        vm.expectRevert("already configured");
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+        vm.stopPrank();
     }
 
     function testCannotConfigureMarketAsCollateralForInvalidCollateralFactor() public {
@@ -399,14 +414,12 @@ contract MarketConfiguratorTest is Test, Common {
 
         // List the pToken first.
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
+        configurator.listPTokenMarket(
+            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
         );
 
-        // List the underlying of the pToken but forget to set the pToken.
-        configurator.listMarket(
-            address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor, false, address(0)
-        );
+        // List the underlying of the pToken.
+        configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
 
         configurator.setMarketPToken(address(market2), address(pToken));
         vm.stopPrank();
@@ -448,9 +461,7 @@ contract MarketConfiguratorTest is Test, Common {
         DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
-        );
+        configurator.listMarket(address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor);
 
         vm.expectRevert("not listed");
         configurator.setMarketPToken(address(notListedMarket), address(pToken));
@@ -470,20 +481,15 @@ contract MarketConfiguratorTest is Test, Common {
 
         // List the pToken first.
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
+        configurator.listPTokenMarket(
+            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
         );
 
         // List the underlying of the pToken.
-        configurator.listMarket(
-            address(market2),
-            address(ibToken1),
-            address(debtToken1),
-            address(irm),
-            reserveFactor,
-            false,
-            address(pToken)
-        );
+        configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
+
+        // Set the pToken.
+        configurator.setMarketPToken(address(market2), address(pToken));
 
         vm.expectRevert("pToken already set");
         configurator.setMarketPToken(address(market2), address(pToken));

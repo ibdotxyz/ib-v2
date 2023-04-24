@@ -37,9 +37,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.prank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
 
         IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
@@ -56,8 +54,8 @@ contract ListDelistTest is Test, Common {
 
         // List a pToken of this market.
         vm.prank(admin);
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
+        configurator.listPTokenMarket(
+            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
         );
 
         // Update the pToken.
@@ -90,8 +88,8 @@ contract ListDelistTest is Test, Common {
 
         // List the pToken first.
         vm.prank(admin);
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
+        configurator.listPTokenMarket(
+            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
         );
 
         IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
@@ -109,9 +107,7 @@ contract ListDelistTest is Test, Common {
 
         // List the underlying of the pToken.
         vm.prank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor, false, address(pToken)
-        );
+        configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
 
         config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
@@ -120,7 +116,11 @@ contract ListDelistTest is Test, Common {
         assertEq(config.interestRateModelAddress, address(irm));
         assertEq(config.reserveFactor, reserveFactor);
         assertFalse(config.isPToken);
-        assertEq(config.pTokenAddress, address(pToken));
+        assertEq(config.pTokenAddress, address(0));
+
+        // Update the pToken.
+        vm.prank(admin);
+        configurator.setMarketPToken(address(market), address(pToken));
 
         markets = ib.getAllMarkets();
         assertEq(markets.length, 2);
@@ -142,9 +142,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.expectRevert("Ownable: caller is not the owner");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
     function testCannotListMarketForAlreadyListed() public {
@@ -153,14 +151,10 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         vm.expectRevert("already listed");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
     function testCannotListMarketForMismatchUnderlying() public {
@@ -171,16 +165,12 @@ contract ListDelistTest is Test, Common {
 
         vm.startPrank(admin);
         vm.expectRevert("mismatch underlying");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         ibToken = createIBToken(admin, address(ib), address(market));
 
         vm.expectRevert("mismatch underlying");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
     function testCannotListMarketForInvalidReserveFactor() public {
@@ -193,49 +183,7 @@ contract ListDelistTest is Test, Common {
         vm.prank(admin);
         vm.expectRevert("invalid reserve factor");
         configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), invalidReserveFactor, false, address(0)
-        );
-    }
-
-    function testCannotListMarketForInvalidParameter() public {
-        ERC20 market = new ERC20("Token", "TOKEN");
-        IBToken ibToken = createIBToken(admin, address(ib), address(market));
-        DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
-
-        PToken pToken = createPToken(admin, address(market));
-
-        vm.prank(admin);
-        vm.expectRevert("invalid parameter");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, true, address(pToken)
-        );
-    }
-
-    function testCannotListMarketForMismatchPToken() public {
-        ERC20 market = new ERC20("Token", "TOKEN");
-        IBToken ibToken = createIBToken(admin, address(ib), address(market));
-        DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
-
-        PToken pToken = createPToken(admin, admin); // invalid pToken
-
-        vm.prank(admin);
-        vm.expectRevert("mismatch pToken");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(pToken)
-        );
-    }
-
-    function testCannotListMarketForPTokenNotListed() public {
-        ERC20 market = new ERC20("Token", "TOKEN");
-        IBToken ibToken = createIBToken(admin, address(ib), address(market));
-        DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
-
-        PToken pToken = createPToken(admin, address(market));
-
-        vm.prank(admin);
-        vm.expectRevert("pToken not listed");
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(pToken)
+            address(market), address(ibToken), address(debtToken), address(irm), invalidReserveFactor
         );
     }
 
@@ -249,11 +197,9 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor, false, address(0)
-        );
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
+        configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
+        configurator.listPTokenMarket(
+            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor
         );
 
         PToken pToken2 = createPToken(admin, address(market));
@@ -261,8 +207,8 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken3 = createDebtToken(admin, address(ib), address(pToken2));
 
         vm.expectRevert("underlying already has pToken");
-        configurator.listMarket(
-            address(pToken2), address(ibToken3), address(debtToken3), address(irm), reserveFactor, true, address(0)
+        configurator.listPTokenMarket(
+            address(pToken2), address(ibToken3), address(debtToken3), address(irm), reserveFactor
         );
         vm.stopPrank();
     }
@@ -275,9 +221,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         configurator.softDelistMarket(address(market));
 
@@ -295,9 +239,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         // Soft delist by separate actions.
         configurator.setMarketSupplyPaused(address(market), true);
@@ -339,9 +281,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         configurator.softDelistMarket(address(market));
         configurator.hardDelistMarket(address(market));
@@ -364,13 +304,9 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
-        configurator.listMarket(
-            address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor, true, address(0)
-        );
+        configurator.listMarket(address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor);
 
         configurator.softDelistMarket(address(pToken));
         configurator.hardDelistMarket(address(pToken));
@@ -415,9 +351,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         vm.expectRevert("not paused");
         configurator.hardDelistMarket(address(market));
@@ -429,9 +363,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         configurator.setMarketSupplyPaused(address(market), true);
         configurator.setMarketBorrowPaused(address(market), true);
@@ -446,9 +378,7 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         vm.startPrank(admin);
-        configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(irm), reserveFactor, false, address(0)
-        );
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         configurator.setMarketSupplyPaused(address(market), true);
         configurator.setMarketBorrowPaused(address(market), true);

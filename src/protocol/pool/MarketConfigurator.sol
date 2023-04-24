@@ -24,8 +24,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
         address debtToken,
         address interestRateModel,
         uint16 reserveFactor,
-        bool isPToken,
-        address pToken
+        bool isPToken
     );
     event MarketDelisted(address market);
     event MarketCollateralFactorSet(address market, uint16 collateralFactor);
@@ -75,72 +74,39 @@ contract MarketConfigurator is Ownable2Step, Constants {
 
     /**
      * @notice List a market to Iron Bank.
-     * @dev The market could be either a pToken or have a pToken.
+     * @dev If the pToken of the market was listed before, need to call `setMarketPToken` to set the pToken address.
      * @param market The market to be listed
      * @param ibTokenAddress The address of the ibToken
      * @param debtTokenAddress The address of the debtToken
      * @param interestRateModelAddress The address of the interest rate model
      * @param reserveFactor The reserve factor of the market
-     * @param isPToken Whether the market is a pToken
-     * @param pTokenAddress The address of the market's pToken if it exists
      */
     function listMarket(
         address market,
         address ibTokenAddress,
         address debtTokenAddress,
         address interestRateModelAddress,
-        uint16 reserveFactor,
-        bool isPToken,
-        address pTokenAddress
+        uint16 reserveFactor
     ) external onlyOwner {
-        IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
-        require(!config.isListed, "already listed");
-        require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
-        require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
-        require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
-        require(!isPToken || pTokenAddress == address(0), "invalid parameter");
+        _listMarket(market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, false);
+    }
 
-        uint8 underlyingDecimals = IERC20Metadata(market).decimals();
-        require(underlyingDecimals <= 18, "nonstandard token decimals");
-
-        if (isPToken) {
-            address underlying = PTokenInterface(market).getUnderlying();
-            IronBankStorage.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
-            // It's possible that the underlying is not listed.
-            if (underlyingConfig.isListed) {
-                require(underlyingConfig.pTokenAddress == address(0), "underlying already has pToken");
-
-                underlyingConfig.pTokenAddress = market;
-                ironBank.setMarketConfiguration(underlying, underlyingConfig);
-
-                emit MarketPTokenSet(underlying, market);
-            }
-        } else if (pTokenAddress != address(0)) {
-            // If the market's pToken is provided, it must match the market and be listed.
-            require(PTokenInterface(pTokenAddress).getUnderlying() == market, "mismatch pToken");
-            require(ironBank.isMarketListed(pTokenAddress), "pToken not listed");
-        }
-
-        config.isListed = true;
-        config.ibTokenAddress = ibTokenAddress;
-        config.debtTokenAddress = debtTokenAddress;
-        config.interestRateModelAddress = interestRateModelAddress;
-        config.reserveFactor = reserveFactor;
-        config.initialExchangeRate = 10 ** underlyingDecimals;
-        if (isPToken) {
-            config.isPToken = true;
-            config.borrowPaused = true;
-            // Set the borrow cap to a very small amount (1 Wei) to prevent borrowing.
-            config.borrowCap = 1;
-        } else if (pTokenAddress != address(0)) {
-            config.pTokenAddress = pTokenAddress;
-        }
-
-        ironBank.listMarket(market, config);
-
-        emit MarketListed(
-            market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, isPToken, pTokenAddress
-            );
+    /**
+     * @notice List a pToken market to Iron Bank.
+     * @param market The market to be listed
+     * @param ibTokenAddress The address of the ibToken
+     * @param debtTokenAddress The address of the debtToken
+     * @param interestRateModelAddress The address of the interest rate model
+     * @param reserveFactor The reserve factor of the market
+     */
+    function listPTokenMarket(
+        address market,
+        address ibTokenAddress,
+        address debtTokenAddress,
+        address interestRateModelAddress,
+        uint16 reserveFactor
+    ) external onlyOwner {
+        _listMarket(market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, true);
     }
 
     /**
@@ -158,6 +124,10 @@ contract MarketConfigurator is Ownable2Step, Constants {
     ) external onlyOwner {
         IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
+        require(
+            config.collateralFactor == 0 && config.liquidationThreshold == 0 && config.liquidationBonus == 0,
+            "already configured"
+        );
         require(collateralFactor > 0 && collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
         require(
             liquidationThreshold > 0 && liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD,
@@ -446,5 +416,63 @@ contract MarketConfigurator is Ownable2Step, Constants {
      */
     function _checkOwnerOrGuardian() internal view {
         require(msg.sender == owner() || msg.sender == guardian, "!authorized");
+    }
+
+    /**
+     * @dev List a vanila market or a pToken market.
+     * @param market The market to be listed
+     * @param ibTokenAddress The ibToken of the market
+     * @param debtTokenAddress The debtToken of the market
+     * @param interestRateModelAddress The interest rate model of the market
+     * @param reserveFactor The reserve factor of the market
+     * @param isPToken Whether the market is a pToken market
+     */
+    function _listMarket(
+        address market,
+        address ibTokenAddress,
+        address debtTokenAddress,
+        address interestRateModelAddress,
+        uint16 reserveFactor,
+        bool isPToken
+    ) internal {
+        IronBankStorage.MarketConfig memory config = getMarketConfiguration(market);
+        require(!config.isListed, "already listed");
+        require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
+        require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
+        require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
+
+        uint8 underlyingDecimals = IERC20Metadata(market).decimals();
+        require(underlyingDecimals <= 18, "nonstandard token decimals");
+
+        if (isPToken) {
+            address underlying = PTokenInterface(market).getUnderlying();
+            IronBankStorage.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
+            // It's possible that the underlying is not listed.
+            if (underlyingConfig.isListed) {
+                require(underlyingConfig.pTokenAddress == address(0), "underlying already has pToken");
+
+                underlyingConfig.pTokenAddress = market;
+                ironBank.setMarketConfiguration(underlying, underlyingConfig);
+
+                emit MarketPTokenSet(underlying, market);
+            }
+        }
+
+        config.isListed = true;
+        config.ibTokenAddress = ibTokenAddress;
+        config.debtTokenAddress = debtTokenAddress;
+        config.interestRateModelAddress = interestRateModelAddress;
+        config.reserveFactor = reserveFactor;
+        config.initialExchangeRate = 10 ** underlyingDecimals;
+        if (isPToken) {
+            config.isPToken = true;
+            config.borrowPaused = true;
+            // Set the borrow cap to a very small amount (1 Wei) to prevent borrowing.
+            config.borrowCap = 1;
+        }
+
+        ironBank.listMarket(market, config);
+
+        emit MarketListed(market, ibTokenAddress, debtTokenAddress, interestRateModelAddress, reserveFactor, isPToken);
     }
 }

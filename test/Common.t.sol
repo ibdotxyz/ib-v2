@@ -143,9 +143,7 @@ abstract contract Common is Test {
         DebtToken debtToken = createDebtToken(_admin, address(_ironBank), address(market));
 
         vm.prank(_admin);
-        _configurator.listMarket(
-            address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor, false, address(0)
-        );
+        _configurator.listMarket(address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor);
         return (market, ibToken, debtToken);
     }
 
@@ -161,9 +159,7 @@ abstract contract Common is Test {
         DebtToken debtToken = createDebtToken(_admin, address(_ironBank), _market);
 
         vm.prank(_admin);
-        _configurator.listMarket(
-            _market, address(ibToken), address(debtToken), address(_irm), _reserveFactor, false, address(0)
-        );
+        _configurator.listMarket(_market, address(ibToken), address(debtToken), address(_irm), _reserveFactor);
         return (ibToken, debtToken);
     }
 
