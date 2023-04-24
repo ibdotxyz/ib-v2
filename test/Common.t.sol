@@ -13,6 +13,7 @@ import "../src/protocol/pool/IronBankProxy.sol";
 import "../src/protocol/pool/MarketConfigurator.sol";
 import "../src/protocol/token/IBToken.sol";
 import "../src/protocol/token/DebtToken.sol";
+import "../src/protocol/token/PToken.sol";
 import "./MockToken.t.sol";
 import "./MockFeedRegistry.t.sol";
 
@@ -73,6 +74,12 @@ abstract contract Common is Test {
         DebtToken debtToken = DebtToken(address(proxy));
         debtToken.initialize("Iron Bank Debt Token", "debtToken", _admin, _pool, _underlying);
         return debtToken;
+    }
+
+    function createPToken(address _admin, address _underlying) internal returns (PToken) {
+        PToken pToken = new PToken("Protected Token", "PTOKEN", _underlying);
+        pToken.transferOwnership(_admin);
+        return pToken;
     }
 
     function createDefaultIRM() internal returns (TripleSlopeRateModel) {
@@ -136,7 +143,9 @@ abstract contract Common is Test {
         DebtToken debtToken = createDebtToken(_admin, address(_ironBank), address(market));
 
         vm.prank(_admin);
-        _configurator.listMarket(address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor);
+        _configurator.listMarket(
+            address(market), address(ibToken), address(debtToken), address(_irm), _reserveFactor, false, address(0)
+        );
         return (market, ibToken, debtToken);
     }
 
@@ -152,7 +161,9 @@ abstract contract Common is Test {
         DebtToken debtToken = createDebtToken(_admin, address(_ironBank), _market);
 
         vm.prank(_admin);
-        _configurator.listMarket(_market, address(ibToken), address(debtToken), address(_irm), _reserveFactor);
+        _configurator.listMarket(
+            _market, address(ibToken), address(debtToken), address(_irm), _reserveFactor, false, address(0)
+        );
         return (ibToken, debtToken);
     }
 

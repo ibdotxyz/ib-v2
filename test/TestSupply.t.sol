@@ -156,7 +156,7 @@ contract SupplyTest is Test, Common {
         uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
 
         vm.prank(admin);
-        configurator.setSupplyPaused(address(market), true);
+        configurator.setMarketSupplyPaused(address(market), true);
 
         vm.prank(user1);
         vm.expectRevert("supply paused");
