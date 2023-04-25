@@ -260,17 +260,6 @@ contract BorrowTest is Test, Common {
         ib.borrow(user1, user1, address(invalidMarket), borrowAmount);
     }
 
-    function testCannotBorrowForMarketFrozen() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
-
-        vm.prank(admin);
-        configurator.freezeMarket(address(market2), true);
-
-        vm.prank(user1);
-        vm.expectRevert("frozen");
-        ib.borrow(user1, user1, address(market2), borrowAmount);
-    }
-
     function testCannotBorrowForMarketBorrowPaused() public {
         uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
 

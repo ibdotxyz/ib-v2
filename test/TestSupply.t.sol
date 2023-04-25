@@ -141,17 +141,6 @@ contract SupplyTest is Test, Common {
         ib.supply(user1, user1, address(invalidMarket), supplyAmount);
     }
 
-    function testCannotSupplyForMarketFrozen() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
-
-        vm.prank(admin);
-        configurator.freezeMarket(address(market), true);
-
-        vm.prank(user1);
-        vm.expectRevert("frozen");
-        ib.supply(user1, user1, address(market), supplyAmount);
-    }
-
     function testCannotSupplyForMarketSupplyPaused() public {
         uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
 

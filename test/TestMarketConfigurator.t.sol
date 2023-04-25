@@ -6,6 +6,8 @@ import "forge-std/Test.sol";
 import "./Common.t.sol";
 
 contract MarketConfiguratorTest is Test, Common {
+    using PauseFlags for DataTypes.MarketConfig;
+
     address admin = address(64);
     address user = address(128);
 
@@ -63,7 +65,7 @@ contract MarketConfiguratorTest is Test, Common {
             address(market), collateralFactor, liquidationThreshold, liquidationBonus
         );
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.collateralFactor, collateralFactor);
         assertEq(config.liquidationThreshold, liquidationThreshold);
         assertEq(config.liquidationBonus, liquidationBonus);
@@ -163,7 +165,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.collateralFactor, collateralFactor);
     }
 
@@ -197,7 +199,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.adjustMarketReserveFactor(address(market), reserveFactor);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.reserveFactor, reserveFactor);
     }
 
@@ -231,7 +233,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.liquidationThreshold, liquidationThreshold);
     }
 
@@ -265,7 +267,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.liquidationBonus, liquidationBonus);
     }
 
@@ -305,7 +307,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.changeMarketInterestRateModel(address(market), address(newIrm));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.interestRateModelAddress, address(newIrm));
     }
 
@@ -325,13 +327,33 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.changeMarketInterestRateModel(address(notListedMarket), address(newIrm));
     }
 
+    function testSetMarketTransferPaused() public {
+        vm.prank(admin);
+        configurator.setMarketTransferPaused(address(market), true);
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        assertTrue(config.isTransferPaused());
+    }
+
+    function testCannotSetMarketTransferPausedForNotOwner() public {
+        vm.prank(user);
+        vm.expectRevert("Ownable: caller is not the owner");
+        configurator.setMarketTransferPaused(address(market), true);
+    }
+
+    function testCannotSetMarketTransferPausedForNotListed() public {
+        vm.prank(admin);
+        vm.expectRevert("not listed");
+        configurator.setMarketTransferPaused(address(notListedMarket), true);
+    }
+
     function testSetMarketSupplyCaps() public {
         uint256 supplyCap = 100;
 
         vm.prank(admin);
         configurator.setMarketSupplyCaps(constructMarketCapArgument(address(market), supplyCap));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.supplyCap, supplyCap);
 
         address guardian = address(256);
@@ -369,7 +391,7 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         configurator.setMarketBorrowCaps(constructMarketCapArgument(address(market), borrowCap));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertEq(config.borrowCap, borrowCap);
 
         address guardian = address(256);
@@ -401,6 +423,60 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.setMarketBorrowCaps(constructMarketCapArgument(address(notListedMarket), borrowCap));
     }
 
+    function testSetMarketSupplyPaused() public {
+        vm.prank(admin);
+        configurator.setMarketSupplyPaused(address(market), true);
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        assertTrue(config.isSupplyPaused());
+    }
+
+    function testCannotSetMarketSupplyPausedForNotOwner() public {
+        vm.prank(user);
+        vm.expectRevert("!authorized");
+        configurator.setMarketSupplyPaused(address(market), true);
+    }
+
+    function testCannotSetMarketSupplyPausedForNotListed() public {
+        vm.prank(admin);
+        vm.expectRevert("not listed");
+        configurator.setMarketSupplyPaused(address(notListedMarket), true);
+    }
+
+    function testSetMarketBorrowPaused() public {
+        vm.prank(admin);
+        configurator.setMarketBorrowPaused(address(market), true);
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        assertTrue(config.isBorrowPaused());
+    }
+
+    function testCannotSetMarketBorrowPausedForNotOwner() public {
+        vm.prank(user);
+        vm.expectRevert("!authorized");
+        configurator.setMarketBorrowPaused(address(market), true);
+    }
+
+    function testCannotSetMarketBorrowPausedForNotListed() public {
+        vm.prank(admin);
+        vm.expectRevert("not listed");
+        configurator.setMarketBorrowPaused(address(notListedMarket), true);
+    }
+
+    function testCannotSetMarketBorrowPausedForPToken() public {
+        uint16 reserveFactor = 1000; // 10%
+
+        PToken pToken = createPToken(admin, address(market));
+        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
+
+        vm.startPrank(admin);
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
+
+        vm.expectRevert("cannot set borrow paused for pToken");
+        configurator.setMarketBorrowPaused(address(pToken), false);
+        vm.stopPrank();
+    }
+
     function testSetMarketPToken() public {
         uint16 reserveFactor = 1000; // 10%
 
@@ -421,7 +497,7 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.setMarketPToken(address(market2), address(pToken));
         vm.stopPrank();
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market2));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market2));
         assertEq(config.pTokenAddress, address(pToken));
     }
 

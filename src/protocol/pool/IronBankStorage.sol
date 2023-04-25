@@ -3,6 +3,7 @@
 pragma solidity ^0.8.0;
 
 import "./Constants.sol";
+import "../../libraries/DataTypes.sol";
 
 contract IronBankStorage is Constants {
     event MarketConfiguratorSet(address configurator);
@@ -59,46 +60,7 @@ contract IronBankStorage is Constants {
 
     event ExtensionRemoved(address user, address extension);
 
-    struct UserBorrow {
-        uint256 borrowBalance;
-        uint256 borrowIndex;
-    }
-
-    struct MarketConfig {
-        // TODO
-        // 1 + 2 + 2 + 2 + 2 + 1 + 1 + 1
-        bool isListed;
-        uint16 collateralFactor;
-        uint16 liquidationThreshold;
-        uint16 liquidationBonus;
-        uint16 reserveFactor;
-        bool supplyPaused;
-        bool borrowPaused;
-        bool isFrozen;
-        // 20 + 20 + 20 + 32 + 32 + 32
-        address ibTokenAddress;
-        address debtTokenAddress;
-        address pTokenAddress;
-        address interestRateModelAddress;
-        uint256 supplyCap;
-        uint256 borrowCap;
-        uint256 initialExchangeRate;
-        bool isPToken;
-    }
-
-    struct Market {
-        MarketConfig config;
-        uint40 lastUpdateTimestamp;
-        uint256 totalCash;
-        uint256 totalBorrow;
-        uint256 totalSupply;
-        uint256 totalReserves;
-        uint256 borrowIndex;
-        mapping(address => UserBorrow) userBorrows;
-        mapping(address => uint256) userSupplies;
-    }
-
-    mapping(address => Market) public markets;
+    mapping(address => DataTypes.Market) public markets;
     address[] public allMarkets;
 
     mapping(address => mapping(address => bool)) public enteredMarkets;

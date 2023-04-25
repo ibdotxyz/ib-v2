@@ -200,17 +200,6 @@ contract RepayTest is Test, Common {
         ib.repay(user1, user1, address(invalidMarket), repayAmount);
     }
 
-    function testCannotRepayForMarketFrozen() public {
-        uint256 repayAmount = 50e18;
-
-        vm.prank(admin);
-        configurator.freezeMarket(address(market1), true);
-
-        vm.prank(user1);
-        vm.expectRevert("frozen");
-        ib.repay(user1, user1, address(market1), repayAmount);
-    }
-
     function testCannotRepayForCreditAccount() public {
         uint256 repayAmount = 50e18;
 

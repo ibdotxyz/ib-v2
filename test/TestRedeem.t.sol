@@ -191,17 +191,6 @@ contract RedeemTest is Test, Common {
         ib.redeem(user1, user1, address(invalidMarket), redeemAmount);
     }
 
-    function testCannotRedeemForMarketFrozen() public {
-        uint256 redeemAmount = 50e18;
-
-        vm.prank(admin);
-        configurator.freezeMarket(address(market1), true);
-
-        vm.prank(user1);
-        vm.expectRevert("frozen");
-        ib.redeem(user1, user1, address(market1), redeemAmount);
-    }
-
     function testCannotRedeemForCreditAccount() public {
         uint256 redeemAmount = 50e18;
 
