@@ -476,6 +476,8 @@ contract IronBank is
         m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
         allMarkets.push(market);
+
+        emit MarketListed(market, m.config, m.lastUpdateTimestamp);
     }
 
     function delistMarket(address market) external onlyMarketConfigurator {
@@ -484,6 +486,8 @@ contract IronBank is
 
         delete markets[market];
         allMarkets.deleteElement(market);
+
+        emit MarketDelisted(market);
     }
 
     function setMarketConfiguration(address market, DataTypes.MarketConfig calldata config)
@@ -494,6 +498,8 @@ contract IronBank is
         require(m.config.isListed, "not listed");
 
         m.config = config;
+
+        emit MarketConfigurationChanged(market, config);
     }
 
     function setCreditLimit(address user, address market, uint256 credit) external onlyCreditLimitManager {

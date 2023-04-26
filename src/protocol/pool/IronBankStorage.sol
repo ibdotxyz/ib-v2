@@ -14,6 +14,12 @@ contract IronBankStorage is Constants {
 
     event PriceOracleSet(address priceOracle);
 
+    event MarketListed(address indexed market, uint40 timestamp, DataTypes.MarketConfig config);
+
+    event MarketDelisted(address indexed market);
+
+    event MarketConfigurationChanged(address indexed market, DataTypes.MarketConfig config);
+
     event InterestAccrued(address indexed market, uint256 interestIncreased, uint256 borrowIndex, uint256 totalBorrow);
 
     event MarketEntered(address indexed market, address indexed user);
