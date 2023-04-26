@@ -6,6 +6,8 @@ import "forge-std/Test.sol";
 import "./Common.t.sol";
 
 contract ListDelistTest is Test, Common {
+    using PauseFlags for DataTypes.MarketConfig;
+
     uint16 internal constant maxReserveFactor = 10000; // 100%;
     uint16 internal constant reserveFactor = 1000; // 10%
     uint16 internal constant collateralFactor = 7000; // 70%
@@ -38,7 +40,7 @@ contract ListDelistTest is Test, Common {
         vm.prank(admin);
         configurator.listMarket(address(market), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
         assertEq(config.ibTokenAddress, address(ibToken1));
         assertEq(config.debtTokenAddress, address(debtToken1));
@@ -86,7 +88,7 @@ contract ListDelistTest is Test, Common {
         vm.prank(admin);
         configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
         assertTrue(config.isListed);
         assertEq(config.ibTokenAddress, address(ibToken2));
         assertEq(config.debtTokenAddress, address(0));
@@ -124,7 +126,7 @@ contract ListDelistTest is Test, Common {
 
     function testCannotListMarketForNotMarketConfigurator() public {
         ERC20 market = new ERC20("Token", "TOKEN");
-        IronBankStorage.MarketConfig memory emptyConfig = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory emptyConfig = ib.getMarketConfiguration(address(market));
 
         vm.expectRevert("!configurator");
         ib.listMarket(address(market), emptyConfig);
@@ -213,10 +215,10 @@ contract ListDelistTest is Test, Common {
 
         configurator.softDelistMarket(address(market));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
-        assertTrue(config.supplyPaused);
-        assertTrue(config.borrowPaused);
+        assertTrue(config.isSupplyPaused());
+        assertTrue(config.isBorrowPaused());
         assertEq(config.reserveFactor, maxReserveFactor);
         assertEq(config.collateralFactor, 0);
     }
@@ -238,10 +240,10 @@ contract ListDelistTest is Test, Common {
         // Won't revert to call soft delist again.
         configurator.softDelistMarket(address(market));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
-        assertTrue(config.supplyPaused);
-        assertTrue(config.borrowPaused);
+        assertTrue(config.isSupplyPaused());
+        assertTrue(config.isBorrowPaused());
         assertEq(config.reserveFactor, maxReserveFactor);
         assertEq(config.collateralFactor, 0);
     }
@@ -274,7 +276,7 @@ contract ListDelistTest is Test, Common {
         configurator.softDelistMarket(address(market));
         configurator.hardDelistMarket(address(market));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertFalse(config.isListed);
 
         address[] memory markets = ib.getAllMarkets();
@@ -299,7 +301,7 @@ contract ListDelistTest is Test, Common {
         configurator.softDelistMarket(address(pToken));
         configurator.hardDelistMarket(address(pToken));
 
-        IronBankStorage.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
         assertFalse(config.isListed);
 
         config = ib.getMarketConfiguration(address(market));

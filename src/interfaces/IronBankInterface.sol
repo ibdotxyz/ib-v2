@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.0;
 
-import "../protocol/pool/IronBankStorage.sol";
+import "../libraries/DataTypes.sol";
 
 interface IronBankInterface {
     /* ========== USER INTERFACES ========== */
@@ -35,13 +35,13 @@ interface IronBankInterface {
 
     /* ========== MARKET CONFIGURATOR INTERFACES ========== */
 
-    function getMarketConfiguration(address market) external view returns (IronBankStorage.MarketConfig memory);
+    function getMarketConfiguration(address market) external view returns (DataTypes.MarketConfig memory);
 
-    function listMarket(address market, IronBankStorage.MarketConfig calldata config) external;
+    function listMarket(address market, DataTypes.MarketConfig calldata config) external;
 
     function delistMarket(address market) external;
 
-    function setMarketConfiguration(address market, IronBankStorage.MarketConfig calldata config) external;
+    function setMarketConfiguration(address market, DataTypes.MarketConfig calldata config) external;
 
     /* ========== CREDIT LIMIT MANAGER INTERFACES ========== */
 

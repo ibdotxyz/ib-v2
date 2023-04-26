@@ -136,12 +136,4 @@ contract AccrueInterestTest is Test, Common {
         vm.expectRevert("not listed");
         ib.accrueInterest(address(invalidMarket));
     }
-
-    function testCannotAccrueInterestsForMarketFrozen() public {
-        vm.prank(admin);
-        configurator.freezeMarket(address(market1), true);
-
-        vm.expectRevert("frozen");
-        ib.accrueInterest(address(market1));
-    }
 }

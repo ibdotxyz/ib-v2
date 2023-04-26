@@ -5,10 +5,14 @@ pragma solidity ^0.8.0;
 import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
+import "../../libraries/DataTypes.sol";
+import "../../libraries/PauseFlags.sol";
 import "../pool/IronBank.sol";
 import "../pool/Constants.sol";
 
 contract IronBankLens is Constants {
+    using PauseFlags for DataTypes.MarketConfig;
+
     struct MarketInfo {
         // market configuration
         bool isListed;
@@ -16,7 +20,7 @@ contract IronBankLens is Constants {
         uint16 reserveFactor;
         bool supplyPaused;
         bool borrowPaused;
-        bool isFrozen;
+        bool transferPaused;
         bool isSoftDelisted;
         address ibTokenAddress;
         address debtTokenAddress;
@@ -42,7 +46,7 @@ contract IronBankLens is Constants {
         returns (MarketInfo memory)
     {
         (
-            IronBankStorage.MarketConfig memory config,
+            DataTypes.MarketConfig memory config,
             ,
             uint256 totalCash,
             uint256 totalBorrow,
@@ -50,8 +54,8 @@ contract IronBankLens is Constants {
             uint256 totalReserves,
         ) = ironBank.markets(market);
 
-        bool isSoftDelisted = config.supplyPaused && config.borrowPaused && config.reserveFactor == MAX_RESERVE_FACTOR
-            && config.collateralFactor == 0;
+        bool isSoftDelisted =
+            config.isSupplyPaused() && config.isBorrowPaused() && config.reserveFactor == MAX_RESERVE_FACTOR;
 
         InterestRateModelInterface irm = InterestRateModelInterface(config.interestRateModelAddress);
 
@@ -59,9 +63,9 @@ contract IronBankLens is Constants {
             isListed: config.isListed,
             collateralFactor: config.collateralFactor,
             reserveFactor: config.reserveFactor,
-            supplyPaused: config.supplyPaused,
-            borrowPaused: config.borrowPaused,
-            isFrozen: config.isFrozen,
+            supplyPaused: config.isSupplyPaused(),
+            borrowPaused: config.isBorrowPaused(),
+            transferPaused: config.isTransferPaused(),
             isSoftDelisted: isSoftDelisted,
             ibTokenAddress: config.ibTokenAddress,
             debtTokenAddress: config.debtTokenAddress,

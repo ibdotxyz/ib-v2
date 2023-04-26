@@ -15,6 +15,8 @@ import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
 import "../../libraries/Arrays.sol";
+import "../../libraries/DataTypes.sol";
+import "../../libraries/PauseFlags.sol";
 
 contract IronBank is
     Initializable,
@@ -26,6 +28,7 @@ contract IronBank is
 {
     using SafeERC20 for IERC20;
     using Arrays for address[];
+    using PauseFlags for DataTypes.MarketConfig;
 
     /**
      * @notice Initialize the contract
@@ -58,22 +61,22 @@ contract IronBank is
     }
 
     function getExchangeRate(address market) public view returns (uint256) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         return _getExchangeRate(m);
     }
 
     function getMarketStatus(address market) public view returns (uint256, uint256, uint256, uint256) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalReserves);
     }
 
     function isMarketListed(address market) public view returns (bool) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         return m.config.isListed;
     }
 
     function getMaxBorrowAmount(address market) public view returns (uint256) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         if (m.config.borrowCap == 0) {
             return m.totalCash;
         }
@@ -88,13 +91,13 @@ contract IronBank is
     }
 
     function getBorrowBalance(address user, address market) public view returns (uint256) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
 
         return _getBorrowBalance(m, user);
     }
 
     function getSupplyBalance(address user, address market) public view returns (uint256) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         return (markets[market].userSupplies[user] * _getExchangeRate(m)) / 1e18;
     }
 
@@ -130,7 +133,7 @@ contract IronBank is
         return allCreditMarkets[user].length > 0;
     }
 
-    function getMarketConfiguration(address market) public view returns (MarketConfig memory) {
+    function getMarketConfiguration(address market) public view returns (DataTypes.MarketConfig memory) {
         return markets[market].config;
     }
 
@@ -151,7 +154,7 @@ contract IronBank is
         view
         returns (uint256)
     {
-        Market storage mCollateral = markets[marketCollateral];
+        DataTypes.Market storage mCollateral = markets[marketCollateral];
 
         return _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
     }
@@ -159,9 +162,8 @@ contract IronBank is
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function accrueInterest(address market) external nonReentrant {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
 
         _accrueInterest(market, m);
     }
@@ -182,10 +184,9 @@ contract IronBank is
         nonReentrant
         isAuthorized(from)
     {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-        require(!m.config.supplyPaused, "supply paused");
+        require(!m.config.isSupplyPaused(), "supply paused");
         require(!isCreditAccount(to), "cannot supply to credit account");
 
         if (m.config.supplyCap != 0) {
@@ -225,10 +226,9 @@ contract IronBank is
         nonReentrant
         isAuthorized(from)
     {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
-        require(!m.config.borrowPaused, "borrow paused");
+        require(!m.config.isBorrowPaused(), "borrow paused");
         require(m.totalCash >= amount, "insufficient cash");
 
         if (m.config.borrowCap != 0) {
@@ -275,9 +275,8 @@ contract IronBank is
         nonReentrant
         isAuthorized(from)
     {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
         require(!isCreditAccount(from), "credit account cannot redeem");
 
         _accrueInterest(market, m);
@@ -319,9 +318,8 @@ contract IronBank is
      * @param amount The amount of asset to repay
      */
     function repay(address from, address to, address market, uint256 amount) external nonReentrant isAuthorized(from) {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
         if (isCreditAccount(to)) {
             require(from == to, "credit account can only repay for itself");
         }
@@ -359,12 +357,11 @@ contract IronBank is
         address marketCollateral,
         uint256 repayAmount
     ) external nonReentrant {
-        Market storage mBorrow = markets[marketBorrow];
-        Market storage mCollateral = markets[marketCollateral];
+        DataTypes.Market storage mBorrow = markets[marketBorrow];
+        DataTypes.Market storage mCollateral = markets[marketCollateral];
         require(mBorrow.config.isListed, "borrow market not listed");
         require(mCollateral.config.isListed, "collateral market not listed");
-        require(!mBorrow.config.isFrozen, "borrow market frozen");
-        require(!mCollateral.config.isFrozen, "collateral market frozen");
+        require(!mCollateral.config.isTransferPaused(), "collateral market transfer paused");
         require(!isCreditAccount(violator), "cannot liquidate credit account");
         require(liquidator != violator, "cannot self liquidate");
 
@@ -404,9 +401,8 @@ contract IronBank is
     }
 
     function addToReserves(address market) external nonReentrant {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
 
         _accrueInterest(market, m);
 
@@ -440,10 +436,9 @@ contract IronBank is
     /* ========== TOKEN HOOKS ========== */
 
     function transferDebt(address market, address from, address to, uint256 amount) external nonReentrant {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(msg.sender == m.config.debtTokenAddress, "!authorized");
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
         require(from != to, "cannot self transfer");
         require(!isCreditAccount(from), "cannot transfer from credit account");
         require(!isCreditAccount(to), "cannot transfer to credit account");
@@ -458,10 +453,10 @@ contract IronBank is
     }
 
     function transferIBToken(address market, address from, address to, uint256 amount) external nonReentrant {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
         require(m.config.isListed, "not listed");
-        require(!m.config.isFrozen, "frozen");
+        require(!m.config.isTransferPaused(), "transfer paused");
         require(from != to, "cannot self transfer");
         require(!isCreditAccount(to), "cannot transfer to credit account");
 
@@ -473,8 +468,8 @@ contract IronBank is
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function listMarket(address market, MarketConfig calldata config) external onlyMarketConfigurator {
-        Market storage m = markets[market];
+    function listMarket(address market, DataTypes.MarketConfig calldata config) external onlyMarketConfigurator {
+        DataTypes.Market storage m = markets[market];
         require(!m.config.isListed, "already listed");
 
         m.lastUpdateTimestamp = _getNow();
@@ -484,22 +479,25 @@ contract IronBank is
     }
 
     function delistMarket(address market) external onlyMarketConfigurator {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
 
         delete markets[market];
         allMarkets.deleteElement(market);
     }
 
-    function setMarketConfiguration(address market, MarketConfig calldata config) external onlyMarketConfigurator {
-        Market storage m = markets[market];
+    function setMarketConfiguration(address market, DataTypes.MarketConfig calldata config)
+        external
+        onlyMarketConfigurator
+    {
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
 
         m.config = config;
     }
 
     function setCreditLimit(address user, address market, uint256 credit) external onlyCreditLimitManager {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
 
         if (credit == 0 && creditLimits[user][market] != 0) {
@@ -531,7 +529,7 @@ contract IronBank is
     }
 
     function seize(address token, address recipient) external onlyOwner {
-        Market storage m = markets[token];
+        DataTypes.Market storage m = markets[token];
 
         uint256 balance = IERC20(token).balanceOf(address(this));
         if (m.config.isListed) {
@@ -545,7 +543,7 @@ contract IronBank is
     }
 
     function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyOwner {
-        Market storage m = markets[market];
+        DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
 
         _accrueInterest(market, m);
@@ -585,7 +583,7 @@ contract IronBank is
         require(msg.sender == marketConfigurator, "!configurator");
     }
 
-    function _getExchangeRate(Market storage m) internal view returns (uint256) {
+    function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
         if (m.totalSupply == 0) {
             return m.config.initialExchangeRate;
         }
@@ -595,7 +593,7 @@ contract IronBank is
     function _getLiquidationAmount(
         address marketBorrow,
         address marketCollateral,
-        Market storage mCollateral,
+        DataTypes.Market storage mCollateral,
         uint256 repayAmount
     ) internal view returns (uint256) {
         uint256 borrowMarketPrice = PriceOracleInterface(priceOracle).getPrice(marketBorrow);
@@ -610,8 +608,8 @@ contract IronBank is
         return (repayAmount * numerator) / denominator;
     }
 
-    function _getBorrowBalance(Market storage m, address user) internal view returns (uint256) {
-        UserBorrow memory b = m.userBorrows[user];
+    function _getBorrowBalance(DataTypes.Market storage m, address user) internal view returns (uint256) {
+        DataTypes.UserBorrow memory b = m.userBorrows[user];
 
         if (b.borrowBalance == 0) {
             return 0;
@@ -621,7 +619,9 @@ contract IronBank is
         return (b.borrowBalance * m.borrowIndex) / b.borrowIndex;
     }
 
-    function _transferDebt(address market, Market storage m, address from, address to, uint256 amount) internal {
+    function _transferDebt(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
+        internal
+    {
         if (amount > 0) {
             _enterMarket(market, to);
 
@@ -636,7 +636,9 @@ contract IronBank is
         }
     }
 
-    function _transferIBToken(address market, Market storage m, address from, address to, uint256 amount) internal {
+    function _transferIBToken(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
+        internal
+    {
         if (amount > 0) {
             _enterMarket(market, to);
 
@@ -649,7 +651,7 @@ contract IronBank is
         }
     }
 
-    function _accrueInterest(address market, Market storage m) internal {
+    function _accrueInterest(address market, DataTypes.Market storage m) internal {
         uint40 timestamp = _getNow();
         uint256 timeElapsed = uint256(timestamp - m.lastUpdateTimestamp);
         if (timeElapsed > 0) {
@@ -720,7 +722,7 @@ contract IronBank is
 
         address[] memory userEnteredMarkets = allEnteredMarkets[user];
         for (uint256 i = 0; i < userEnteredMarkets.length; i++) {
-            Market storage m = markets[userEnteredMarkets[i]];
+            DataTypes.Market storage m = markets[userEnteredMarkets[i]];
             if (!m.config.isListed) {
                 continue;
             }
@@ -729,7 +731,7 @@ contract IronBank is
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
-            uint256 collateralFactor = uint256(m.config.collateralFactor);
+            uint256 collateralFactor = m.config.collateralFactor;
             if (supplyBalance > 0 && collateralFactor > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
                 collateralValue += (supplyBalance * exchangeRate * assetPrice * collateralFactor) / 1e36 / FACTOR_SCALE;
