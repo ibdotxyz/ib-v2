@@ -129,7 +129,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
             config.collateralFactor == 0 && config.liquidationThreshold == 0 && config.liquidationBonus == 0,
             "already configured"
         );
-        require(collateralFactor > 0 && collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
+        require(collateralFactor > 0 && collateralFactor <= MAX_COLLATERAL_FACTOR, "invalid collateral factor");
         require(
             liquidationThreshold > 0 && liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD,
             "invalid liquidation threshold"
@@ -157,7 +157,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     function adjustMarketCollateralFactor(address market, uint16 collateralFactor) external onlyOwner {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(collateralFactor <= MAX_COLLATETAL_FACTOR, "invalid collateral factor");
+        require(collateralFactor <= MAX_COLLATERAL_FACTOR, "invalid collateral factor");
 
         config.collateralFactor = collateralFactor;
         ironBank.setMarketConfiguration(market, config);
