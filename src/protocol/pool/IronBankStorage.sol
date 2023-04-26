@@ -20,11 +20,19 @@ contract IronBankStorage is Constants {
 
     event MarketConfigurationChanged(address indexed market, DataTypes.MarketConfig config);
 
-    event InterestAccrued(address indexed market, uint256 interestIncreased, uint256 borrowIndex, uint256 totalBorrow);
-
     event MarketEntered(address indexed market, address indexed user);
 
     event MarketExited(address indexed market, address indexed user);
+
+    event InterestAccrued(
+        address indexed market,
+        uint40 timestamp,
+        uint256 borrowRatePerSecond,
+        uint256 borrowIndex,
+        uint256 totalBorrow,
+        uint256 totalSupply,
+        uint256 totalReserves
+    );
 
     event Supply(
         address indexed market, address indexed from, address indexed to, uint256 amount, uint256 ibTokenAmount
