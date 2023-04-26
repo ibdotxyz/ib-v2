@@ -382,7 +382,7 @@ contract IronBank is
 
         _checkAccountLiquidity(liquidator);
 
-        emit Liquidate(liquidator, violator, marketBorrow, marketCollateral, repayAmount);
+        emit Liquidate(liquidator, violator, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
 
     function deferLiquidityCheck(address user, bytes memory data) external {

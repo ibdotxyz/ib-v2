@@ -57,7 +57,8 @@ contract IronBankStorage is Constants {
         address indexed violator,
         address indexed marketBorrow,
         address marketCollateral,
-        uint256 repayAmount
+        uint256 repayAmount,
+        uint256 seizedAmount
     );
 
     event TokenSeized(address indexed token, address indexed recipient, uint256 amount);
