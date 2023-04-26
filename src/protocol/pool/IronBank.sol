@@ -563,7 +563,7 @@ contract IronBank is
 
         IERC20(market).safeTransfer(recipient, amount);
 
-        emit ReservesDecreased(market, ibTokenAmount, amount, recipient);
+        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */

@@ -10,7 +10,7 @@ contract IronBankStorage is Constants {
 
     event CreditLimitManagerSet(address manager);
 
-    event CreditLimitChanged(address user, address market, uint256 credit);
+    event CreditLimitChanged(address indexed user, address indexed market, uint256 credit);
 
     event PriceOracleSet(address priceOracle);
 
@@ -27,44 +27,48 @@ contract IronBankStorage is Constants {
     event MarketExited(address indexed market, address indexed user);
 
     event Supply(
-        address indexed market, address from, address indexed to, uint256 indexed amount, uint256 ibTokenAmount
+        address indexed market, address indexed from, address indexed to, uint256 amount, uint256 ibTokenAmount
     );
 
     event Borrow(
         address indexed market,
         address indexed from,
-        address to,
-        uint256 indexed amount,
+        address indexed to,
+        uint256 amount,
         uint256 accountBorrow,
         uint256 totalBorrow
     );
 
     event Redeem(
-        address indexed market, address indexed from, address to, uint256 indexed amount, uint256 ibTokenAmount
+        address indexed market, address indexed from, address indexed to, uint256 amount, uint256 ibTokenAmount
     );
 
     event Repay(
         address indexed market,
-        address from,
+        address indexed from,
         address indexed to,
-        uint256 indexed amount,
+        uint256 amount,
         uint256 accountBorrow,
         uint256 totalBorrow
     );
 
     event Liquidate(
-        address liquidator, address violator, address marketBorrow, address marketCollateral, uint256 repayAmount
+        address indexed liquidator,
+        address indexed violator,
+        address indexed marketBorrow,
+        address marketCollateral,
+        uint256 repayAmount
     );
 
-    event TokenSeized(address token, address recipient, uint256 amount);
+    event TokenSeized(address indexed token, address indexed recipient, uint256 amount);
 
-    event ReservesIncreased(address market, uint256 ibTokenAmount, uint256 amount);
+    event ReservesIncreased(address indexed market, uint256 ibTokenAmount, uint256 amount);
 
-    event ReservesDecreased(address market, uint256 ibTokenAmount, uint256 amount, address recipient);
+    event ReservesDecreased(address indexed market, address indexed recipient, uint256 ibTokenAmount, uint256 amount);
 
-    event ExtensionAdded(address user, address extension);
+    event ExtensionAdded(address indexed user, address indexed extension);
 
-    event ExtensionRemoved(address user, address extension);
+    event ExtensionRemoved(address indexed user, address indexed extension);
 
     mapping(address => DataTypes.Market) public markets;
     address[] public allMarkets;
