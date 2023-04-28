@@ -163,14 +163,16 @@ abstract contract Common is Test {
         return (ibToken, debtToken);
     }
 
-    function setMarketCollateralFactor(
+    function configureMarketAsCollateral(
         address _admin,
         MarketConfigurator _configurator,
         address _market,
         uint16 _collateralFactor
     ) internal {
+        uint16 liquidationBonus = 11000; // 110%
+
         vm.prank(_admin);
-        _configurator.adjustMarketCollateralFactor(_market, _collateralFactor);
+        _configurator.configureMarketAsCollateral(_market, _collateralFactor, _collateralFactor, liquidationBonus);
     }
 
     function setPriceForMarket(

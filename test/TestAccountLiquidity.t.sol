@@ -40,8 +40,8 @@ contract AccountLiquidityTest is Test, Common {
         (market1,,) = createAndListERC20Market(underlyingDecimals1, admin, ib, configurator, irm, reserveFactor);
         (market2,,) = createAndListERC20Market(underlyingDecimals2, admin, ib, configurator, irm, reserveFactor);
 
-        setMarketCollateralFactor(admin, configurator, address(market1), collateralFactor);
-        setMarketCollateralFactor(admin, configurator, address(market2), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
@@ -123,6 +123,7 @@ contract AccountLiquidityTest is Test, Common {
         vm.startPrank(admin);
         configurator.softDelistMarket(address(market2));
         configurator.adjustMarketCollateralFactor(address(market2), 0);
+        configurator.adjustMarketLiquidationThreshold(address(market2), 0);
         configurator.hardDelistMarket(address(market2));
 
         /**

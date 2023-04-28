@@ -47,8 +47,8 @@ contract RedeemTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.USD, market2Price);
 
-        setMarketCollateralFactor(admin, configurator, address(market1), collateralFactor);
-        setMarketCollateralFactor(admin, configurator, address(market2), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
 
         vm.startPrank(admin);
         market1.transfer(user1, 10000e18);
