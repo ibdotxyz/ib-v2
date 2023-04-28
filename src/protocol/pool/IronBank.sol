@@ -149,6 +149,22 @@ contract IronBank is
         return markets[market].config.pTokenAddress;
     }
 
+    /**
+     * @notice Check if an account is liquidatable.
+     * @param user The address of the account to check
+     * @return true if the account is liquidatable, false otherwise
+     */
+    function isUserLiquidatable(address user) public view returns (bool) {
+        return _isLiquidatable(user);
+    }
+
+    /**
+     * @notice Calculate the amount of ibToken that can be seized in a liquidation.
+     * @param marketBorrow The address of the market being borrowed from
+     * @param marketCollateral The address of the market being used as collateral
+     * @param repayAmount The amount of the borrowed asset being repaid
+     * @return The amount of ibToken that can be seized
+     */
     function calculateLiquidationOpportunity(address marketBorrow, address marketCollateral, uint256 repayAmount)
         public
         view
@@ -268,7 +284,7 @@ contract IronBank is
      * @param from The address which will redeem the asset
      * @param to The address which will receive the token
      * @param market The address of the market
-     * @param amount The amount of asset to redeem
+     * @param amount The amount of asset to redeem, or type(uint256).max for max
      */
     function redeem(address from, address to, address market, uint256 amount)
         external
@@ -315,7 +331,7 @@ contract IronBank is
      * @param from The address which will repay the asset
      * @param to The address which will hold the balance
      * @param market The address of the market
-     * @param amount The amount of asset to repay
+     * @param amount The amount of asset to repay, or type(uint256).max for max
      */
     function repay(address from, address to, address market, uint256 amount) external nonReentrant isAuthorized(from) {
         DataTypes.Market storage m = markets[market];
@@ -326,63 +342,48 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
-        uint256 newUserBorrowBalance;
-        if (amount == type(uint256).max) {
-            amount = _getBorrowBalance(m, to);
-        } else {
-            newUserBorrowBalance = _getBorrowBalance(m, to) - amount;
-        }
-
-        // Update internal cash and total borrow in pool.
-        m.totalCash += amount;
-        m.totalBorrow -= amount;
-
-        // Update user borrow status.
-        m.userBorrows[to].borrowBalance = newUserBorrowBalance;
-        m.userBorrows[to].borrowIndex = m.borrowIndex;
-
-        if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
-            _exitMarket(market, to);
-        }
-
-        IERC20(market).safeTransferFrom(from, address(this), amount);
-
-        emit Repay(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
+        _repay(m, from, to, market, amount);
     }
 
+    /**
+     * @notice Liquidate an undercollateralized borrower.
+     * @param liquidator The address which will liquidate the borrower
+     * @param borrower The address of the borrower
+     * @param marketBorrow The address of the borrow market
+     * @param marketCollateral The address of the collateral market
+     * @param repayAmount The amount of asset to repay, or type(uint256).max for max
+     */
     function liquidate(
         address liquidator,
-        address violator,
+        address borrower,
         address marketBorrow,
         address marketCollateral,
         uint256 repayAmount
-    ) external nonReentrant {
+    ) external nonReentrant isAuthorized(liquidator) {
         DataTypes.Market storage mBorrow = markets[marketBorrow];
         DataTypes.Market storage mCollateral = markets[marketCollateral];
         require(mBorrow.config.isListed, "borrow market not listed");
         require(mCollateral.config.isListed, "collateral market not listed");
-        require(!mCollateral.config.isTransferPaused(), "collateral market transfer paused");
-        require(!isCreditAccount(violator), "cannot liquidate credit account");
-        require(liquidator != violator, "cannot self liquidate");
+        require(isMarketSeizable(mCollateral), "collateral market cannot be seized");
+        require(!isCreditAccount(borrower), "cannot liquidate credit account");
+        require(liquidator != borrower, "cannot self liquidate");
 
         _accrueInterest(marketBorrow, mBorrow);
         _accrueInterest(marketCollateral, mCollateral);
 
-        // Check if the liquidator is actually liquidatable.
-        (uint256 collateralValue, uint256 debtValue) = _getAccountLiquidity(violator);
-        require(collateralValue < debtValue, "not liquidatable");
+        // Check if the borrower is actually liquidatable.
+        require(_isLiquidatable(borrower), "borrower not liquidatable");
 
-        // Transfer debt.
-        _transferDebt(marketBorrow, mBorrow, violator, liquidator, repayAmount);
+        // Repay the debt.
+        repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
-        // Transfer collateral.
+        // Seize the collateral.
         uint256 ibTokenAmount = _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
-        _transferIBToken(marketCollateral, mCollateral, violator, liquidator, ibTokenAmount);
-        IBTokenInterface(mCollateral.config.ibTokenAddress).seize(violator, liquidator, ibTokenAmount);
+        require(mCollateral.userSupplies[borrower] >= ibTokenAmount, "seize too much");
+        _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
+        IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount);
 
-        _checkAccountLiquidity(liquidator);
-
-        emit Liquidate(liquidator, violator, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
+        emit Liquidate(liquidator, borrower, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
 
     function deferLiquidityCheck(address user, bytes memory data) external {
@@ -477,7 +478,7 @@ contract IronBank is
         m.config = config;
         allMarkets.push(market);
 
-        emit MarketListed(market, m.config, m.lastUpdateTimestamp);
+        emit MarketListed(market, m.lastUpdateTimestamp, m.config);
     }
 
     function delistMarket(address market) external onlyMarketConfigurator {
@@ -596,6 +597,14 @@ contract IronBank is
         return ((m.totalCash + m.totalBorrow) * 1e18) / m.totalSupply;
     }
 
+    /**
+     * @dev Get the amount of ibToken that can be seized in a liquidation.
+     * @param marketBorrow The address of the market being borrowed from
+     * @param marketCollateral The address of the market being used as collateral
+     * @param mCollateral The storage of the collateral market
+     * @param repayAmount The amount of the borrowed asset being repaid
+     * @return The amount of ibToken that can be seized
+     */
     function _getLiquidationAmount(
         address marketBorrow,
         address marketCollateral,
@@ -611,6 +620,8 @@ contract IronBank is
         //   = repayAmount * (liquidationBonus * borrowMarketPrice) / (collateralMarketPrice * exchangeRate)
         uint256 numerator = (mCollateral.config.liquidationBonus * borrowMarketPrice) / FACTOR_SCALE;
         uint256 denominator = (_getExchangeRate(mCollateral) * collateralMarketPrice) / 1e18;
+        require(numerator > 0 && denominator > 0);
+
         return (repayAmount * numerator) / denominator;
     }
 
@@ -667,7 +678,8 @@ contract IronBank is
             uint256 totalSupply = m.totalSupply;
             uint256 totalReserves = m.totalReserves;
 
-            uint256 borrowRatePerSecond = InterestRateModelInterface(m.config.interestRateModelAddress).getBorrowRate(totalCash, totalBorrow);
+            uint256 borrowRatePerSecond =
+                InterestRateModelInterface(m.config.interestRateModelAddress).getBorrowRate(totalCash, totalBorrow);
             uint256 interestFactor = borrowRatePerSecond * timeElapsed;
             uint256 interestIncreased = (interestFactor * totalBorrow) / 1e18;
             uint256 feeIncreased = (interestIncreased * m.config.reserveFactor) / FACTOR_SCALE;
@@ -675,7 +687,8 @@ contract IronBank is
             // Compute supplyIncreased.
             uint256 supplyIncreased = 0;
             if (feeIncreased > 0) {
-                supplyIncreased = (feeIncreased * totalSupply) / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
+                supplyIncreased =
+                    (feeIncreased * totalSupply) / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
             }
 
             // Compute new states.
@@ -692,14 +705,8 @@ contract IronBank is
             m.totalReserves = totalReserves;
 
             emit InterestAccrued(
-                market,
-                timestamp,
-                borrowRatePerSecond,
-                borrowIndex,
-                totalBorrow,
-                totalSupply,
-                totalReserves
-            );
+                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalSupply, totalReserves
+                );
         }
     }
 
@@ -725,6 +732,45 @@ contract IronBank is
         allEnteredMarkets[user].deleteElement(market);
 
         emit MarketExited(market, user);
+    }
+
+    /**
+     * @dev Repay an amount of asset to Iron Bank.
+     * @param m The market object
+     * @param from The address which will repay the asset
+     * @param to The address which will hold the balance
+     * @param market The address of the market
+     * @param amount The amount of asset to repay, or type(uint256).max for max
+     * @return The actual amount repaid
+     */
+    function _repay(DataTypes.Market storage m, address from, address to, address market, uint256 amount)
+        internal
+        returns (uint256)
+    {
+        uint256 newUserBorrowBalance;
+        if (amount == type(uint256).max) {
+            amount = _getBorrowBalance(m, to);
+        } else {
+            newUserBorrowBalance = _getBorrowBalance(m, to) - amount;
+        }
+
+        // Update internal cash and total borrow in pool.
+        m.totalCash += amount;
+        m.totalBorrow -= amount;
+
+        // Update user borrow status.
+        m.userBorrows[to].borrowBalance = newUserBorrowBalance;
+        m.userBorrows[to].borrowIndex = m.borrowIndex;
+
+        if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
+            _exitMarket(market, to);
+        }
+
+        IERC20(market).safeTransferFrom(from, address(this), amount);
+
+        emit Repay(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
+
+        return amount;
     }
 
     function _checkAccountLiquidity(address user) internal {
@@ -763,5 +809,47 @@ contract IronBank is
             }
         }
         return (collateralValue, debtValue);
+    }
+
+    /**
+     * @dev Check if an account is liquidatable.
+     * @param user The address of the account to check
+     * @return true if the account is liquidatable, false otherwise
+     */
+    function _isLiquidatable(address user) internal view returns (bool) {
+        uint256 liquidationCollateralValue;
+        uint256 debtValue;
+
+        address[] memory userEnteredMarkets = allEnteredMarkets[user];
+        for (uint256 i = 0; i < userEnteredMarkets.length; i++) {
+            DataTypes.Market storage m = markets[userEnteredMarkets[i]];
+            if (!m.config.isListed) {
+                continue;
+            }
+
+            uint256 supplyBalance = m.userSupplies[user];
+            uint256 borrowBalance = _getBorrowBalance(m, user);
+
+            uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
+            uint256 liquidationThreshold = m.config.liquidationThreshold;
+            if (supplyBalance > 0 && liquidationThreshold > 0) {
+                uint256 exchangeRate = _getExchangeRate(m);
+                liquidationCollateralValue +=
+                    (supplyBalance * exchangeRate * assetPrice * liquidationThreshold) / 1e36 / FACTOR_SCALE;
+            }
+            if (borrowBalance > 0) {
+                debtValue += (borrowBalance * assetPrice) / 1e18;
+            }
+        }
+        return debtValue > liquidationCollateralValue;
+    }
+
+    /**
+     * @dev Check if a market is seizable when a liquidation happens.
+     * @param m The market object
+     * @return true if the market is seizable, false otherwise
+     */
+    function isMarketSeizable(DataTypes.Market storage m) internal view returns (bool) {
+        return !m.config.isTransferPaused() && m.config.liquidationThreshold > 0;
     }
 }
