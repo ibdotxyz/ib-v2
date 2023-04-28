@@ -7,7 +7,7 @@ abstract contract Constants {
     uint256 internal constant INITIAL_EXCHANGE_RATE = 1e18;
     uint256 internal constant FACTOR_SCALE = 10000;
 
-    uint16 internal constant MAX_COLLATETAL_FACTOR = 9000; // 90%
+    uint16 internal constant MAX_COLLATERAL_FACTOR = 9000; // 90%
     uint16 internal constant MAX_LIQUIDATION_THRESHOLD = 10000; // 100%
     uint16 internal constant MIN_LIQUIDATION_BONUS = 10000; // 100%
     uint16 internal constant MAX_LIQUIDATION_BONUS = 12500; // 125%

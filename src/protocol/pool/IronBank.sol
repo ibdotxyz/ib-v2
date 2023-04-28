@@ -382,7 +382,7 @@ contract IronBank is
 
         _checkAccountLiquidity(liquidator);
 
-        emit Liquidate(liquidator, violator, marketBorrow, marketCollateral, repayAmount);
+        emit Liquidate(liquidator, violator, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
 
     function deferLiquidityCheck(address user, bytes memory data) external {
@@ -476,6 +476,8 @@ contract IronBank is
         m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
         allMarkets.push(market);
+
+        emit MarketListed(market, m.config, m.lastUpdateTimestamp);
     }
 
     function delistMarket(address market) external onlyMarketConfigurator {
@@ -484,6 +486,8 @@ contract IronBank is
 
         delete markets[market];
         allMarkets.deleteElement(market);
+
+        emit MarketDelisted(market);
     }
 
     function setMarketConfiguration(address market, DataTypes.MarketConfig calldata config)
@@ -494,6 +498,8 @@ contract IronBank is
         require(m.config.isListed, "not listed");
 
         m.config = config;
+
+        emit MarketConfigurationChanged(market, config);
     }
 
     function setCreditLimit(address user, address market, uint256 credit) external onlyCreditLimitManager {
@@ -557,7 +563,7 @@ contract IronBank is
 
         IERC20(market).safeTransfer(recipient, amount);
 
-        emit ReservesDecreased(market, ibTokenAmount, amount, recipient);
+        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
@@ -655,29 +661,45 @@ contract IronBank is
         uint40 timestamp = _getNow();
         uint256 timeElapsed = uint256(timestamp - m.lastUpdateTimestamp);
         if (timeElapsed > 0) {
-            uint256 borrowRate =
-                InterestRateModelInterface(m.config.interestRateModelAddress).getBorrowRate(m.totalCash, m.totalBorrow);
-            uint256 interestFactor = (borrowRate * timeElapsed);
-            uint256 interestIncreased = (interestFactor * m.totalBorrow) / 1e18;
-            uint256 newTotalBorrow = m.totalBorrow + interestIncreased;
+            uint256 totalCash = m.totalCash;
+            uint256 borrowIndex = m.borrowIndex;
+            uint256 totalBorrow = m.totalBorrow;
+            uint256 totalSupply = m.totalSupply;
+            uint256 totalReserves = m.totalReserves;
+
+            uint256 borrowRatePerSecond = InterestRateModelInterface(m.config.interestRateModelAddress).getBorrowRate(totalCash, totalBorrow);
+            uint256 interestFactor = borrowRatePerSecond * timeElapsed;
+            uint256 interestIncreased = (interestFactor * totalBorrow) / 1e18;
             uint256 feeIncreased = (interestIncreased * m.config.reserveFactor) / FACTOR_SCALE;
-            uint256 newTotalSupply = m.totalSupply;
-            uint256 newTotalReserves = m.totalReserves;
+
+            // Compute supplyIncreased.
+            uint256 supplyIncreased = 0;
             if (feeIncreased > 0) {
-                uint256 poolSize = m.totalCash + newTotalBorrow;
-                newTotalSupply = (m.totalSupply * poolSize) / (poolSize - feeIncreased);
-                newTotalReserves += newTotalSupply - m.totalSupply;
+                supplyIncreased = (feeIncreased * totalSupply) / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
             }
 
-            m.totalBorrow = newTotalBorrow;
-            m.borrowIndex += (interestFactor * m.borrowIndex) / 1e18;
+            // Compute new states.
+            borrowIndex += (interestFactor * borrowIndex) / 1e18;
+            totalBorrow += interestIncreased;
+            totalSupply += supplyIncreased;
+            totalReserves += supplyIncreased;
+
+            // Update state variables.
             m.lastUpdateTimestamp = timestamp;
-            if (newTotalSupply != m.totalSupply) {
-                m.totalSupply = newTotalSupply;
-                m.totalReserves = newTotalReserves;
-            }
+            m.borrowIndex = borrowIndex;
+            m.totalBorrow = totalBorrow;
+            m.totalSupply = totalSupply;
+            m.totalReserves = totalReserves;
 
-            emit InterestAccrued(market, interestIncreased, m.borrowIndex, m.totalBorrow);
+            emit InterestAccrued(
+                market,
+                timestamp,
+                borrowRatePerSecond,
+                borrowIndex,
+                totalBorrow,
+                totalSupply,
+                totalReserves
+            );
         }
     }
 
