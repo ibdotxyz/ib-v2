@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./Constants.sol";
+import "../../interfaces/DebtTokenInterface.sol";
 import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 import "../../interfaces/PTokenInterface.sol";
@@ -493,7 +494,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
                 emit MarketPTokenSet(underlying, market);
             }
         } else {
-            require(IBTokenInterface(debtTokenAddress).getUnderlying() == market, "mismatch underlying");
+            require(DebtTokenInterface(debtTokenAddress).getMarket() == market, "mismatch underlying");
         }
 
         config.isListed = true;

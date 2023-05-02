@@ -125,32 +125,6 @@ contract EnterExitMarketTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testTransferDebtToken() public {
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
-
-        vm.startPrank(user2);
-        market2.approve(address(ib), market2BorrowAmount);
-        ib.supply(user2, user2, address(market2), market2BorrowAmount);
-        market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user2, user2, address(market1), market1SupplyAmount);
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        market1.approve(address(ib), market1SupplyAmount);
-        ib.supply(user1, user1, address(market1), market1SupplyAmount);
-        ib.borrow(user1, user1, address(market2), market2BorrowAmount);
-        assertTrue(ib.isEnteredMarket(user1, address(market2)));
-        vm.stopPrank();
-
-        vm.startPrank(user2);
-        // User2 takes the market2 debt from user1.
-        debtToken2.receiveDebt(user1, debtToken2.balanceOf(user1));
-        assertFalse(ib.isEnteredMarket(user1, address(market2)));
-        assertTrue(ib.isEnteredMarket(user2, address(market2)));
-        vm.stopPrank();
-    }
-
     function testExitMarket1() public {
         uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
         uint256 market1BorrowAmount = 10 * (10 ** underlyingDecimals);

@@ -3,13 +3,11 @@
 pragma solidity ^0.8.0;
 
 contract DebtTokenStorage {
-    event DebtApproval(address indexed from, address indexed to, uint256 indexed amount);
+    string internal _name;
 
-    event TransferDebt(address indexed from, address indexed to, uint256 indexed value);
+    string internal _symbol;
 
-    address internal _pool;
+    address public ironBank;
 
-    address internal _underlying;
-
-    mapping(address => mapping(address => uint256)) internal _debtAllowances;
+    address public market;
 }
