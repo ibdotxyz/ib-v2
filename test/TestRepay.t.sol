@@ -46,8 +46,8 @@ contract RepayTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.USD, market2Price);
 
-        setMarketCollateralFactor(admin, configurator, address(market1), collateralFactor);
-        setMarketCollateralFactor(admin, configurator, address(market2), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
 
         vm.startPrank(admin);
         market1.transfer(user2, 10000e18);
@@ -182,7 +182,7 @@ contract RepayTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testCannotForUnauthorized() public {
+    function testCannotRepayForUnauthorized() public {
         uint256 repayAmount = 50e18;
 
         vm.prank(user2);

@@ -151,6 +151,7 @@ contract ListDelistTest is Test, Common {
 
         vm.expectRevert("already listed");
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
+        vm.stopPrank();
     }
 
     function testCannotListMarketForMismatchUnderlying() public {
@@ -167,6 +168,7 @@ contract ListDelistTest is Test, Common {
 
         vm.expectRevert("mismatch underlying");
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
+        vm.stopPrank();
     }
 
     function testCannotListMarketForInvalidReserveFactor() public {
@@ -214,6 +216,7 @@ contract ListDelistTest is Test, Common {
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         configurator.softDelistMarket(address(market));
+        vm.stopPrank();
 
         DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
@@ -235,10 +238,10 @@ contract ListDelistTest is Test, Common {
         configurator.setMarketSupplyPaused(address(market), true);
         configurator.setMarketBorrowPaused(address(market), true);
         configurator.adjustMarketReserveFactor(address(market), maxReserveFactor);
-        configurator.adjustMarketCollateralFactor(address(market), 0);
 
         // Won't revert to call soft delist again.
         configurator.softDelistMarket(address(market));
+        vm.stopPrank();
 
         DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isListed);
@@ -345,6 +348,7 @@ contract ListDelistTest is Test, Common {
 
         vm.expectRevert("not paused");
         configurator.hardDelistMarket(address(market));
+        vm.stopPrank();
     }
 
     function testCannotHardDelistForReserveFactorNotMax() public {
@@ -360,6 +364,7 @@ contract ListDelistTest is Test, Common {
 
         vm.expectRevert("reserve factor not max");
         configurator.hardDelistMarket(address(market));
+        vm.stopPrank();
     }
 
     function testCannotHardDelistForCollateralFactorNotZero() public {
@@ -373,9 +378,11 @@ contract ListDelistTest is Test, Common {
         configurator.setMarketSupplyPaused(address(market), true);
         configurator.setMarketBorrowPaused(address(market), true);
         configurator.adjustMarketReserveFactor(address(market), maxReserveFactor);
+        configurator.adjustMarketLiquidationThreshold(address(market), collateralFactor);
         configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
 
-        vm.expectRevert("collateral factor not zero");
+        vm.expectRevert("collateral factor or liquidation threshold not zero");
         configurator.hardDelistMarket(address(market));
+        vm.stopPrank();
     }
 }

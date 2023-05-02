@@ -57,7 +57,7 @@ contract MarketConfiguratorTest is Test, Common {
 
     function testConfigureMarketAsCollateral() public {
         uint16 collateralFactor = 7000; // 70%
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
 
         vm.prank(admin);
@@ -73,7 +73,7 @@ contract MarketConfiguratorTest is Test, Common {
 
     function testCannotConfigureMarketAsCollateralForNotOwner() public {
         uint16 collateralFactor = 7000; // 70%
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
 
         vm.prank(user);
@@ -85,7 +85,7 @@ contract MarketConfiguratorTest is Test, Common {
 
     function testCannotConfigureMarketAsCollateralForNotListed() public {
         uint16 collateralFactor = 7000; // 70%
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
 
         vm.prank(admin);
@@ -97,7 +97,7 @@ contract MarketConfiguratorTest is Test, Common {
 
     function testCannotConfigureMarketAsCollateralForAlreadyConfigured() public {
         uint16 collateralFactor = 7000; // 70%
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
 
         vm.startPrank(admin);
@@ -113,7 +113,7 @@ contract MarketConfiguratorTest is Test, Common {
     }
 
     function testCannotConfigureMarketAsCollateralForInvalidCollateralFactor() public {
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
 
         uint16 invalidCollateralFactor = 9100; // 91%
@@ -136,11 +136,19 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.configureMarketAsCollateral(
             address(market), collateralFactor, invalidLiquidationThreshold, liquidationBonus
         );
+
+        invalidLiquidationThreshold = 6900; // 69%
+
+        vm.prank(admin);
+        vm.expectRevert("invalid liquidation threshold");
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, invalidLiquidationThreshold, liquidationBonus
+        );
     }
 
     function testCannotConfigureMarketAsCollateralForInvalidLiquidationBonus() public {
         uint16 collateralFactor = 7000; // 70%
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 liquidationThreshold = 8000; // 80%
 
         uint16 invalidLiquidationBonus = 9900; // 99%
 
@@ -159,8 +167,29 @@ contract MarketConfiguratorTest is Test, Common {
         );
     }
 
+    function testCannotConfigureMarketAsCollateralForInvalidParameter() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 9500; // 95%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        vm.expectRevert("liquidation threshold * liquidation bonus larger than 100%");
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+    }
+
     function testAdjustMarketCollateralFactor() public {
         uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        collateralFactor = 6000; // 60%
 
         vm.prank(admin);
         configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
@@ -190,6 +219,23 @@ contract MarketConfiguratorTest is Test, Common {
 
         vm.prank(admin);
         vm.expectRevert("invalid collateral factor");
+        configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
+    }
+
+    function testCannotAdjustMarketCollateralFactorForCollateralFactorLargerThanLiquidationThreshold() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        collateralFactor = 8100; // 81%
+
+        vm.prank(admin);
+        vm.expectRevert("collateral factor larger than liquidation threshold");
         configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
     }
 
@@ -228,7 +274,40 @@ contract MarketConfiguratorTest is Test, Common {
     }
 
     function testAdjustMarketLiquidationThreshold() public {
-        uint16 liquidationThreshold = 5000; // 50%
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationThreshold = 8500; // 85%
+
+        vm.prank(admin);
+        configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        assertEq(config.liquidationThreshold, liquidationThreshold);
+    }
+
+    function testAdjustMarketLiquidationThreshold2() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        collateralFactor = 0; // 0%
+
+        vm.prank(admin);
+        configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
+
+        liquidationThreshold = 0; // 0%
 
         vm.prank(admin);
         configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
@@ -261,8 +340,97 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
     }
 
-    function testAdjustMarketLiquidationBonus() public {
+    function testAdjustMarketLiquidationThresholdForLiquidationThresholdSmallerThanCollateralFactor() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
         uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationThreshold = 6900; // 69%
+
+        vm.prank(admin);
+        vm.expectRevert("liquidation threshold smaller than collateral factor");
+        configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
+    }
+
+    function testAdjustMarketLiquidationThresholdForInvalidParameter() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationThreshold = 9500; // 95%
+
+        vm.prank(admin);
+        vm.expectRevert("liquidation threshold * liquidation bonus larger than 100%");
+        configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
+    }
+
+    function testAdjustMarketLiquidationThresholdForCollateralFactorNotZero() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationThreshold = 0; // 0%
+
+        vm.prank(admin);
+        vm.expectRevert("collateral factor not zero");
+        configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
+    }
+
+    function testAdjustMarketLiquidationBonus() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationBonus = 10500; // 105%
+
+        vm.prank(admin);
+        configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
+        assertEq(config.liquidationBonus, liquidationBonus);
+    }
+
+    function testAdjustMarketLiquidationBonus2() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        collateralFactor = 0; // 0%
+
+        vm.prank(admin);
+        configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
+
+        liquidationThreshold = 0; // 0%
+
+        vm.prank(admin);
+        configurator.adjustMarketLiquidationThreshold(address(market), liquidationThreshold);
+
+        liquidationBonus = 0; // 0%
 
         vm.prank(admin);
         configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
@@ -301,6 +469,49 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
     }
 
+    function testAdjustMarketLiquidationBonusForInvalidParameter() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 9000; // 90%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationBonus = 12000; // 120%
+
+        vm.prank(admin);
+        vm.expectRevert("liquidation threshold * liquidation bonus larger than 100%");
+        configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
+    }
+
+    function testAdjustMarketLiquidationBonusForCollateralFactorOrLiquidationThresholdNotZero() public {
+        uint16 collateralFactor = 7000; // 70%
+        uint16 liquidationThreshold = 8000; // 80%
+        uint16 liquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market), collateralFactor, liquidationThreshold, liquidationBonus
+        );
+
+        liquidationBonus = 0; // 0%
+
+        vm.prank(admin);
+        vm.expectRevert("collateral factor or liquidation threshold not zero");
+        configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
+
+        collateralFactor = 0; // 0%
+
+        vm.prank(admin);
+        configurator.adjustMarketCollateralFactor(address(market), collateralFactor);
+
+        vm.prank(admin);
+        vm.expectRevert("collateral factor or liquidation threshold not zero");
+        configurator.adjustMarketLiquidationBonus(address(market), liquidationBonus);
+    }
+
     function testChangeMarketInterestRateModel() public {
         TripleSlopeRateModel newIrm = createDefaultIRM();
 
@@ -333,6 +544,12 @@ contract MarketConfiguratorTest is Test, Common {
 
         DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isTransferPaused());
+
+        vm.prank(admin);
+        configurator.setMarketTransferPaused(address(market), false);
+
+        config = ib.getMarketConfiguration(address(market));
+        assertFalse(config.isTransferPaused());
     }
 
     function testCannotSetMarketTransferPausedForNotOwner() public {
@@ -429,6 +646,12 @@ contract MarketConfiguratorTest is Test, Common {
 
         DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isSupplyPaused());
+
+        vm.prank(admin);
+        configurator.setMarketSupplyPaused(address(market), false);
+
+        config = ib.getMarketConfiguration(address(market));
+        assertFalse(config.isSupplyPaused());
     }
 
     function testCannotSetMarketSupplyPausedForNotOwner() public {
@@ -449,6 +672,12 @@ contract MarketConfiguratorTest is Test, Common {
 
         DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
         assertTrue(config.isBorrowPaused());
+
+        vm.prank(admin);
+        configurator.setMarketBorrowPaused(address(market), false);
+
+        config = ib.getMarketConfiguration(address(market));
+        assertFalse(config.isBorrowPaused());
     }
 
     function testCannotSetMarketBorrowPausedForNotOwner() public {

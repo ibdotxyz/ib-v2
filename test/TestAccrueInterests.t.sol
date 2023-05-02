@@ -52,8 +52,8 @@ contract AccrueInterestTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.USD, market2Price);
 
-        setMarketCollateralFactor(admin, configurator, address(market1), market1CollateralFactor);
-        setMarketCollateralFactor(admin, configurator, address(market2), market2CollateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
         vm.startPrank(admin);
         market1.transfer(user1, 10_000 * (10 ** underlyingDecimals1));

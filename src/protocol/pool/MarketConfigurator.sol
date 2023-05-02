@@ -112,6 +112,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
 
     /**
      * @notice Configure a market as collateral.
+     * @dev This function is used for the first time to configure a market as collateral.
      * @param market The market to be configured
      * @param collateralFactor The collateral factor of the market
      * @param liquidationThreshold The liquidation threshold of the market
@@ -131,12 +132,18 @@ contract MarketConfigurator is Ownable2Step, Constants {
         );
         require(collateralFactor > 0 && collateralFactor <= MAX_COLLATERAL_FACTOR, "invalid collateral factor");
         require(
-            liquidationThreshold > 0 && liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD,
+            liquidationThreshold > 0 && liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD
+                && liquidationThreshold >= collateralFactor,
             "invalid liquidation threshold"
         );
         require(
             liquidationBonus > MIN_LIQUIDATION_BONUS && liquidationBonus <= MAX_LIQUIDATION_BONUS,
             "invalid liquidation bonus"
+        );
+        require(
+            uint256(liquidationThreshold) * uint256(liquidationBonus) / FACTOR_SCALE
+                <= MAX_LIQUIDATION_THRESHOLD_X_BONUS,
+            "liquidation threshold * liquidation bonus larger than 100%"
         );
 
         config.collateralFactor = collateralFactor;
@@ -157,7 +164,12 @@ contract MarketConfigurator is Ownable2Step, Constants {
     function adjustMarketCollateralFactor(address market, uint16 collateralFactor) external onlyOwner {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(collateralFactor <= MAX_COLLATERAL_FACTOR, "invalid collateral factor");
+        if (collateralFactor > 0) {
+            require(collateralFactor <= MAX_COLLATERAL_FACTOR, "invalid collateral factor");
+            require(
+                collateralFactor <= config.liquidationThreshold, "collateral factor larger than liquidation threshold"
+            );
+        }
 
         config.collateralFactor = collateralFactor;
         ironBank.setMarketConfiguration(market, config);
@@ -192,10 +204,19 @@ contract MarketConfigurator is Ownable2Step, Constants {
     function adjustMarketLiquidationThreshold(address market, uint16 liquidationThreshold) external onlyOwner {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(
-            liquidationThreshold > 0 && liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD,
-            "invalid liquidation threshold"
-        );
+        if (liquidationThreshold > 0) {
+            require(liquidationThreshold <= MAX_LIQUIDATION_THRESHOLD, "invalid liquidation threshold");
+            require(
+                liquidationThreshold >= config.collateralFactor, "liquidation threshold smaller than collateral factor"
+            );
+            require(
+                uint256(liquidationThreshold) * uint256(config.liquidationBonus) / FACTOR_SCALE
+                    <= MAX_LIQUIDATION_THRESHOLD_X_BONUS,
+                "liquidation threshold * liquidation bonus larger than 100%"
+            );
+        } else {
+            require(config.collateralFactor == 0, "collateral factor not zero");
+        }
 
         config.liquidationThreshold = liquidationThreshold;
         ironBank.setMarketConfiguration(market, config);
@@ -211,10 +232,22 @@ contract MarketConfigurator is Ownable2Step, Constants {
     function adjustMarketLiquidationBonus(address market, uint16 liquidationBonus) external onlyOwner {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(
-            liquidationBonus > MIN_LIQUIDATION_BONUS && liquidationBonus <= MAX_LIQUIDATION_BONUS,
-            "invalid liquidation bonus"
-        );
+        if (liquidationBonus > 0) {
+            require(
+                liquidationBonus > MIN_LIQUIDATION_BONUS && liquidationBonus <= MAX_LIQUIDATION_BONUS,
+                "invalid liquidation bonus"
+            );
+            require(
+                uint256(config.liquidationThreshold) * uint256(liquidationBonus) / FACTOR_SCALE
+                    <= MAX_LIQUIDATION_THRESHOLD_X_BONUS,
+                "liquidation threshold * liquidation bonus larger than 100%"
+            );
+        } else {
+            require(
+                config.collateralFactor == 0 && config.liquidationThreshold == 0,
+                "collateral factor or liquidation threshold not zero"
+            );
+        }
 
         config.liquidationBonus = liquidationBonus;
         ironBank.setMarketConfiguration(market, config);
@@ -273,7 +306,10 @@ contract MarketConfigurator is Ownable2Step, Constants {
         require(config.isListed, "not listed");
         require(config.isSupplyPaused() && config.isBorrowPaused(), "not paused");
         require(config.reserveFactor == MAX_RESERVE_FACTOR, "reserve factor not max");
-        require(config.collateralFactor == 0, "collateral factor not zero");
+        require(
+            config.collateralFactor == 0 && config.liquidationThreshold == 0,
+            "collateral factor or liquidation threshold not zero"
+        );
 
         if (config.isPToken) {
             address underlying = PTokenInterface(market).getUnderlying();

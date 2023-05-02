@@ -62,9 +62,9 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         setPriceForMarket(oracle, admin, DAI, DAI, Denominations.USD);
         setPriceForMarket(oracle, admin, USDT, USDT, Denominations.USD);
 
-        setMarketCollateralFactor(admin, configurator, WETH, wethCollateralFactor);
-        setMarketCollateralFactor(admin, configurator, DAI, stableCollateralFactor);
-        setMarketCollateralFactor(admin, configurator, USDT, stableCollateralFactor);
+        configureMarketAsCollateral(admin, configurator, WETH, wethCollateralFactor);
+        configureMarketAsCollateral(admin, configurator, DAI, stableCollateralFactor);
+        configureMarketAsCollateral(admin, configurator, USDT, stableCollateralFactor);
 
         // Inject liquidity into pool and user1.
         vm.startPrank(wethHolder);

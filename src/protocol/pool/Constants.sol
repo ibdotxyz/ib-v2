@@ -11,6 +11,7 @@ abstract contract Constants {
     uint16 internal constant MAX_LIQUIDATION_THRESHOLD = 10000; // 100%
     uint16 internal constant MIN_LIQUIDATION_BONUS = 10000; // 100%
     uint16 internal constant MAX_LIQUIDATION_BONUS = 12500; // 125%
+    uint16 internal constant MAX_LIQUIDATION_THRESHOLD_X_BONUS = 10000; // 100%
     uint16 internal constant MAX_RESERVE_FACTOR = 10000; // 100%
 
     uint8 internal constant LIQUIDITY_CHECK_NORMAL = 0;
