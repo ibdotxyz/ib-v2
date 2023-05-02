@@ -70,6 +70,11 @@ contract IronBank is
         return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalReserves);
     }
 
+    function getTotalBorrow(address market) public view returns (uint256) {
+        DataTypes.Market storage m = markets[market];
+        return m.totalBorrow;
+    }
+
     function isMarketListed(address market) public view returns (bool) {
         DataTypes.Market storage m = markets[market];
         return m.config.isListed;
@@ -434,25 +439,6 @@ contract IronBank is
         }
     }
 
-    /* ========== TOKEN HOOKS ========== */
-
-    function transferDebt(address market, address from, address to, uint256 amount) external nonReentrant {
-        DataTypes.Market storage m = markets[market];
-        require(msg.sender == m.config.debtTokenAddress, "!authorized");
-        require(m.config.isListed, "not listed");
-        require(from != to, "cannot self transfer");
-        require(!isCreditAccount(from), "cannot transfer from credit account");
-        require(!isCreditAccount(to), "cannot transfer to credit account");
-
-        _accrueInterest(market, m);
-        if (amount == type(uint256).max) {
-            amount = _getBorrowBalance(m, from);
-        }
-        _transferDebt(market, m, from, to, amount);
-
-        _checkAccountLiquidity(to);
-    }
-
     function transferIBToken(address market, address from, address to, uint256 amount) external nonReentrant {
         DataTypes.Market storage m = markets[market];
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
@@ -634,23 +620,6 @@ contract IronBank is
 
         // borrowBalanceWithInterests = borrowBalance * marketBorrowIndex / userBorrowIndex
         return (b.borrowBalance * m.borrowIndex) / b.borrowIndex;
-    }
-
-    function _transferDebt(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
-        internal
-    {
-        if (amount > 0) {
-            _enterMarket(market, to);
-
-            m.userBorrows[from].borrowBalance -= amount;
-            m.userBorrows[from].borrowIndex = m.borrowIndex;
-            m.userBorrows[to].borrowBalance += amount;
-            m.userBorrows[to].borrowIndex = m.borrowIndex;
-
-            if (m.userBorrows[from].borrowBalance == 0 && m.userSupplies[from] == 0) {
-                _exitMarket(market, from);
-            }
-        }
     }
 
     function _transferIBToken(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
