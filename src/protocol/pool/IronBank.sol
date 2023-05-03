@@ -65,11 +65,6 @@ contract IronBank is
         return _getExchangeRate(m);
     }
 
-    function getMarketStatus(address market) public view returns (uint256, uint256, uint256, uint256) {
-        DataTypes.Market storage m = markets[market];
-        return (m.totalCash, m.totalBorrow, m.totalSupply, m.totalReserves);
-    }
-
     function getTotalBorrow(address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
         return m.totalBorrow;
@@ -78,21 +73,6 @@ contract IronBank is
     function isMarketListed(address market) public view returns (bool) {
         DataTypes.Market storage m = markets[market];
         return m.config.isListed;
-    }
-
-    function getMaxBorrowAmount(address market) public view returns (uint256) {
-        DataTypes.Market storage m = markets[market];
-        if (m.config.borrowCap == 0) {
-            return m.totalCash;
-        }
-        if (m.config.borrowCap > m.totalBorrow) {
-            uint256 gap = m.config.borrowCap - m.totalBorrow;
-            if (gap < m.totalCash) {
-                return gap;
-            }
-            return m.totalCash;
-        }
-        return 0;
     }
 
     function getBorrowBalance(address user, address market) public view returns (uint256) {
@@ -140,18 +120,6 @@ contract IronBank is
 
     function getMarketConfiguration(address market) public view returns (DataTypes.MarketConfig memory) {
         return markets[market].config;
-    }
-
-    function getIBTokenAddress(address market) public view returns (address) {
-        return markets[market].config.ibTokenAddress;
-    }
-
-    function getDebtTokenAddress(address market) public view returns (address) {
-        return markets[market].config.debtTokenAddress;
-    }
-
-    function getPTokenAddress(address market) public view returns (address) {
-        return markets[market].config.pTokenAddress;
     }
 
     /**

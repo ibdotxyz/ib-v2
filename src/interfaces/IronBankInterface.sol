@@ -27,10 +27,6 @@ interface IronBankInterface {
 
     function getTotalBorrow(address market) external view returns (uint256);
 
-    function getMarketStatus(address market) external view returns (uint256, uint256, uint256, uint256);
-
-    function getMaxBorrowAmount(address market) external view returns (uint256);
-
     function transferIBToken(address market, address from, address to, uint256 amount) external;
 
     /* ========== MARKET CONFIGURATOR INTERFACES ========== */

@@ -85,7 +85,7 @@ contract SupplyTest is Test, Common {
         assertEq(ib.getSupplyBalance(user2, address(market)), 200e18);
         assertTrue(ib.isEnteredMarket(user2, address(market)));
         assertEq(ibToken.totalSupply(), 400e18);
-        (,, uint256 totalSupply,) = ib.getMarketStatus(address(market));
+        (,,,, uint256 totalSupply,,) = ib.markets(address(market));
         assertEq(totalSupply, 400e18);
     }
 

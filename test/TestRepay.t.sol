@@ -136,8 +136,7 @@ contract RepayTest is Test, Common {
 
         // There is no borrower but the total borrow is still greater than 0.
         // The reason is the same as above.
-        (, uint256 totalBorrow,,) = ib.getMarketStatus(address(market1));
-        assertGt(totalBorrow, 0);
+        assertGt(ib.getTotalBorrow(address(market1)), 0);
     }
 
     function testCannotRepayForInsufficientAllowance() public {
