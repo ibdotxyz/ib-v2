@@ -6,7 +6,6 @@ import "forge-std/Test.sol";
 import "./Common.t.sol";
 
 contract BorrowTest is Test, Common {
-    uint8 internal constant underlyingDecimals = 18; // 1e18
     uint16 internal constant reserveFactor = 1000; // 10%
 
     int256 internal constant market1Price = 1500e8;
@@ -39,10 +38,8 @@ contract BorrowTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market1,, debtToken1) =
-            createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
-        (market2,, debtToken2) =
-            createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
+        (market1,, debtToken1) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
+        (market2,, debtToken2) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
@@ -54,14 +51,14 @@ contract BorrowTest is Test, Common {
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
 
         vm.startPrank(admin);
-        market1.transfer(user1, 10_000 * (10 ** underlyingDecimals));
-        market2.transfer(user2, 10_000 * (10 ** underlyingDecimals));
+        market1.transfer(user1, 10000e18);
+        market2.transfer(user2, 10000e18);
         vm.stopPrank();
     }
 
     function testBorrow() public {
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 market1SupplyAmount = 100e18;
+        uint256 market2BorrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
@@ -95,8 +92,8 @@ contract BorrowTest is Test, Common {
     }
 
     function testBorrowToOther() public {
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 market1SupplyAmount = 100e18;
+        uint256 market2BorrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
@@ -135,8 +132,8 @@ contract BorrowTest is Test, Common {
     }
 
     function testBorrowOnBehalf() public {
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 market1SupplyAmount = 100e18;
+        uint256 market2BorrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
@@ -173,9 +170,9 @@ contract BorrowTest is Test, Common {
     }
 
     function testBorrowWithInterests() public {
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 300 * (10 ** underlyingDecimals);
-        uint256 market2SupplyAmount = 500 * (10 ** underlyingDecimals);
+        uint256 market1SupplyAmount = 100e18;
+        uint256 market2BorrowAmount = 300e18;
+        uint256 market2SupplyAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2SupplyAmount);
@@ -213,7 +210,7 @@ contract BorrowTest is Test, Common {
     }
 
     function testBorrowWithCreditLimit() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
@@ -243,7 +240,7 @@ contract BorrowTest is Test, Common {
     }
 
     function testCannotBorrowForUnauthorized() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.prank(user1);
         vm.expectRevert("!authorized");
@@ -253,7 +250,7 @@ contract BorrowTest is Test, Common {
     function testCannotBorrowForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.prank(user1);
         vm.expectRevert("not listed");
@@ -261,7 +258,7 @@ contract BorrowTest is Test, Common {
     }
 
     function testCannotBorrowForMarketBorrowPaused() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.prank(admin);
         configurator.setMarketBorrowPaused(address(market2), true);
@@ -272,7 +269,7 @@ contract BorrowTest is Test, Common {
     }
 
     function testCannotBorrowForInsufficientCash() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
@@ -285,8 +282,8 @@ contract BorrowTest is Test, Common {
     }
 
     function testCannotBorrowForBorrowCapReached() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
-        uint256 borrowCap = 499 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
+        uint256 borrowCap = 499e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
@@ -301,8 +298,34 @@ contract BorrowTest is Test, Common {
         ib.borrow(user1, user1, address(market2), borrowAmount);
     }
 
+    function testCannotBorrowForBorrowCapReached2() public {
+        uint256 borrowCap = 500e18;
+        uint256 borrowAmount = borrowCap - 1; // borrow almost to cap
+
+        vm.prank(admin);
+        configurator.setMarketBorrowCaps(constructMarketCapArgument(address(market2), borrowCap));
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), 500e18);
+        ib.supply(user2, user2, address(market2), 500e18);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), 100e18);
+        ib.supply(user1, user1, address(market1), 100e18);
+        ib.borrow(user1, user1, address(market2), borrowAmount);
+        vm.stopPrank();
+
+        fastForwardTime(86400);
+
+        // The total borrow is now greater than the borrw cap due to the borrow interest.
+        vm.prank(user1);
+        vm.expectRevert("borrow cap reached");
+        ib.borrow(user1, user1, address(market2), 1);
+    }
+
     function testCannotBorrowForInsufficientCreditLimit() public {
-        uint256 borrowAmount = 500 * (10 ** underlyingDecimals);
+        uint256 borrowAmount = 500e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), borrowAmount);
@@ -322,8 +345,8 @@ contract BorrowTest is Test, Common {
          * collateral value = 100 * 0.8 * 1500 = 120,000
          * borrowed value = 601 * 200 = 120,200
          */
-        uint256 market1SupplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 market2BorrowAmount = 601 * (10 ** underlyingDecimals);
+        uint256 market1SupplyAmount = 100e18;
+        uint256 market2BorrowAmount = 601e18;
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
