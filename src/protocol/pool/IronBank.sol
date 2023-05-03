@@ -439,6 +439,14 @@ contract IronBank is
         }
     }
 
+    /**
+     * @notice Transfer IBToken from one account to another.
+     * @dev This function is callable by the IBToken contract only.
+     * @param market The address of the market
+     * @param from The address to transfer from
+     * @param to The address to transfer to
+     * @param amount The amount to transfer
+     */
     function transferIBToken(address market, address from, address to, uint256 amount) external nonReentrant {
         DataTypes.Market storage m = markets[market];
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
@@ -622,6 +630,14 @@ contract IronBank is
         return (b.borrowBalance * m.borrowIndex) / b.borrowIndex;
     }
 
+    /**
+     * @dev Transfer IBToken from one account to another.
+     * @param market The address of the market
+     * @param m The storage of the market
+     * @param from The address to transfer from
+     * @param to The address to transfer to
+     * @param amount The amount to transfer
+     */
     function _transferIBToken(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
         internal
     {

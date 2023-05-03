@@ -475,7 +475,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     ) internal {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
-        require(IBTokenInterface(ibTokenAddress).getUnderlying() == market, "mismatch underlying");
+        require(IBTokenInterface(ibTokenAddress).asset() == market, "mismatch market");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
         uint8 underlyingDecimals = IERC20Metadata(market).decimals();
@@ -494,7 +494,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
                 emit MarketPTokenSet(underlying, market);
             }
         } else {
-            require(DebtTokenInterface(debtTokenAddress).getMarket() == market, "mismatch underlying");
+            require(DebtTokenInterface(debtTokenAddress).asset() == market, "mismatch market");
         }
 
         config.isListed = true;

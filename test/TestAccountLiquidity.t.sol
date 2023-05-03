@@ -22,6 +22,8 @@ contract AccountLiquidityTest is Test, Common {
 
     ERC20Market market1;
     ERC20Market market2;
+    IBToken ibToken1;
+    IBToken ibToken2;
 
     address admin = address(64);
     address user = address(128);
@@ -37,8 +39,10 @@ contract AccountLiquidityTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market1,,) = createAndListERC20Market(underlyingDecimals1, admin, ib, configurator, irm, reserveFactor);
-        (market2,,) = createAndListERC20Market(underlyingDecimals2, admin, ib, configurator, irm, reserveFactor);
+        (market1, ibToken1,) =
+            createAndListERC20Market(underlyingDecimals1, admin, ib, configurator, irm, reserveFactor);
+        (market2, ibToken2,) =
+            createAndListERC20Market(underlyingDecimals2, admin, ib, configurator, irm, reserveFactor);
 
         configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
@@ -99,7 +103,49 @@ contract AccountLiquidityTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testGetAccountLiquidity2() public {
+    function testGetAccountLiquidityWithTransferIBToken() public {
+        uint256 market1SupplyAmount = 1000 * (10 ** underlyingDecimals1);
+        uint256 market2SupplyAmount = 1000 * (10 ** underlyingDecimals2);
+
+        vm.startPrank(user);
+        market1.approve(address(ib), market1SupplyAmount);
+        ib.supply(user, user, address(market1), market1SupplyAmount);
+        market2.approve(address(ib), market2SupplyAmount);
+        ib.supply(user, user, address(market2), market2SupplyAmount);
+
+        /**
+         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) = 2,400,000
+         * debt value = 0
+         */
+        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user);
+        assertEq(collateralValue, 2400000e18);
+        assertEq(debtValue, 0);
+
+        uint256 market1BorrowAmount = 200 * (10 ** underlyingDecimals1);
+        ib.borrow(user, user, address(market1), market1BorrowAmount);
+
+        /**
+         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) = 2,400,000
+         * debt value = 200 * 1500 = 300,000
+         */
+        (collateralValue, debtValue) = ib.getAccountLiquidity(user);
+        assertEq(collateralValue, 2400000e18);
+        assertEq(debtValue, 300000e18);
+
+        uint256 balance = ibToken1.balanceOf(user);
+        ibToken1.transfer(admin, balance);
+
+        /**
+         * collateral value = 1000 * 0.8 * (0.5 * 3000) = 1,200,000
+         * debt value = 200 * 1500 = 300,000
+         */
+        (collateralValue, debtValue) = ib.getAccountLiquidity(user);
+        assertEq(collateralValue, 1200000e18);
+        assertEq(debtValue, 300000e18);
+        vm.stopPrank();
+    }
+
+    function testGetAccountLiquidityWithDelisting() public {
         uint256 market1SupplyAmount = 1000 * (10 ** underlyingDecimals1);
         uint256 market2SupplyAmount = 1000 * (10 ** underlyingDecimals2);
 

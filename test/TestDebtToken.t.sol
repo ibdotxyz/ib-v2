@@ -13,7 +13,6 @@ contract DebtTokenTest is Test, Common {
 
     IronBank ib;
     MarketConfigurator configurator;
-    CreditLimitManager creditLimitManager;
     FeedRegistry registry;
     PriceOracle oracle;
 
@@ -31,9 +30,6 @@ contract DebtTokenTest is Test, Common {
 
         configurator = createMarketConfigurator(admin, ib);
         ib.setMarketConfigurator(address(configurator));
-
-        creditLimitManager = createCreditLimitManager(admin, ib);
-        ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
@@ -55,9 +51,9 @@ contract DebtTokenTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testGetMarket() public {
-        assertEq(address(market1), debtToken1.getMarket());
-        assertEq(address(market2), debtToken2.getMarket());
+    function testAsset() public {
+        assertEq(address(market1), debtToken1.asset());
+        assertEq(address(market2), debtToken2.asset());
     }
 
     function testDecimals() public {
