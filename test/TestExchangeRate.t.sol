@@ -343,4 +343,64 @@ contract ExchangeRateTest is Test, Common {
         assertEq(totalSupply, 0);
         assertEq(totalReserves, 0);
     }
+
+    function testExchangeRate1e6ManipulationFailed() public {
+        // Provides sufficient liquidity to prevent exchange rate manipulation.
+        uint256 market2SupplyAmount = 10 * 10 ** underlyingDecimals2;
+
+        vm.startPrank(admin);
+        market2.approve(address(ib), market2SupplyAmount);
+        ib.supply(admin, admin, address(market2), market2SupplyAmount);
+        ibToken2.transfer(user1, 10 ** (18 - underlyingDecimals2) - 1);
+        vm.stopPrank();
+
+        vm.startPrank(user1);
+        ib.redeem(user1, user1, address(market2), type(uint256).max);
+        vm.stopPrank();
+
+        /**
+         * admin market2 amount = 10
+         * total cash = 10 - 0 = 10
+         * total borrow = 0
+         * total supply = 10 - 0.000000999999999999 = 9.999999000000000001
+         * new exchange rate = 10 / 9.999999000000000001 = 1.000000_1 (truncate to 1e6)
+         */
+        assertEq(ib.getExchangeRate(address(market2)), 10 ** underlyingDecimals2);
+
+        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market2));
+        assertEq(totalCash, market2SupplyAmount);
+        assertEq(totalBorrow, 0);
+        assertEq(totalSupply, ibToken2.balanceOf(admin));
+        assertEq(totalReserves, 0);
+    }
+
+    function testExchangeRate1e6Manipulation() public {
+        uint256 market2SupplyAmount = 1;
+
+        vm.startPrank(admin);
+        market2.approve(address(ib), market2SupplyAmount);
+        ib.supply(admin, admin, address(market2), market2SupplyAmount);
+        ibToken2.transfer(user1, 1);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        ib.redeem(admin, admin, address(market2), type(uint256).max);
+        vm.stopPrank();
+
+        /**
+         * admin market2 amount = 0.999999
+         * total cash = 0.000001
+         * total borrow = 0
+         * total supply = 1 wei
+         * new exchange rate = 10 ** (-6) / 10 ** (-18) = 10 ** 12
+         */
+        // exchange rate has been manipulated 10^12 times
+        assertEq(ib.getExchangeRate(address(market2)), 10 ** (underlyingDecimals2 + 12));
+
+        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market2));
+        assertEq(totalCash, 1);
+        assertEq(totalBorrow, 0);
+        assertEq(totalSupply, 1);
+        assertEq(totalReserves, 0);
+    }
 }
