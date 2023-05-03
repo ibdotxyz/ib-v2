@@ -13,7 +13,7 @@ contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpg
     /**
      * @notice Initialize the contract
      */
-    function initialize(string memory name_, string memory symbol_, address admin_, address pool_, address underlying_)
+    function initialize(string memory name_, string memory symbol_, address admin_, address ironBank_, address market_)
         public
         initializer
     {
@@ -22,48 +22,78 @@ contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpg
         __UUPSUpgradeable_init();
 
         transferOwnership(admin_);
-        _pool = pool_;
-        _underlying = underlying_;
+        ironBank = ironBank_;
+        market = market_;
     }
 
-    modifier onlyPool() {
-        _checkPool();
+    /**
+     * @notice Check if the caller is Iron Bank.
+     */
+    modifier onlyIronBank() {
+        _checkIronBank();
         _;
     }
 
     /* ========== VIEW FUNCTIONS ========== */
 
-    function getPool() public view returns (address) {
-        return _pool;
-    }
-
-    function getUnderlying() public view returns (address) {
-        return _underlying;
+    /**
+     * @notice Return the underlying market.
+     */
+    function asset() public view returns (address) {
+        return market;
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
+    /**
+     * @notice Transfer IBToken to another address.
+     * @param to The address to receive IBToken
+     * @param amount The amount of IBToken to transfer
+     */
     function transfer(address to, uint256 amount) public override returns (bool) {
-        IronBankInterface(getPool()).transferIBToken(getUnderlying(), msg.sender, to, amount);
+        IronBankInterface(ironBank).transferIBToken(market, msg.sender, to, amount);
         return super.transfer(to, amount);
     }
 
+    /**
+     * @notice Transfer IBToken from one address to another.
+     * @param from The address to send IBToken from
+     * @param to The address to receive IBToken
+     * @param amount The amount of IBToken to transfer
+     */
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        IronBankInterface(getPool()).transferIBToken(getUnderlying(), from, to, amount);
+        IronBankInterface(ironBank).transferIBToken(market, from, to, amount);
         return super.transferFrom(from, to, amount);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function mint(address account, uint256 amount) external onlyPool {
+    /**
+     * @notice Mint IBToken.
+     * @param account The address to receive IBToken
+     * @param amount The amount of IBToken to mint
+     */
+    function mint(address account, uint256 amount) external onlyIronBank {
         _mint(account, amount);
     }
 
-    function burn(address account, uint256 amount) external onlyPool {
+    /**
+     * @notice Burn IBToken.
+     * @param account The address to burn IBToken from
+     * @param amount The amount of IBToken to burn
+     */
+    function burn(address account, uint256 amount) external onlyIronBank {
         _burn(account, amount);
     }
 
-    function seize(address from, address to, uint256 amount) external onlyPool {
+    /**
+     * @notice Seize IBToken.
+     * @dev This function will only be called when a liquidation occurs.
+     * @param from The address to seize IBToken from
+     * @param to The address to receive IBToken
+     * @param amount The amount of IBToken to seize
+     */
+    function seize(address from, address to, uint256 amount) external onlyIronBank {
         require(from != to, "cannot self seize");
         _transfer(from, to, amount);
     }
@@ -78,7 +108,10 @@ contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpg
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-    function _checkPool() internal view {
-        require(msg.sender == getPool(), "!pool");
+    /**
+     * @dev Check if the caller is the Iron Bank.
+     */
+    function _checkIronBank() internal view {
+        require(msg.sender == ironBank, "!authorized");
     }
 }

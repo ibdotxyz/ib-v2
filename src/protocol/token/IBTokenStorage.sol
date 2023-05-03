@@ -3,7 +3,7 @@
 pragma solidity ^0.8.0;
 
 contract IBTokenStorage {
-    address internal _pool;
+    address public ironBank;
 
-    address internal _underlying;
+    address public market;
 }

@@ -161,12 +161,12 @@ contract ListDelistTest is Test, Common {
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market2));
 
         vm.startPrank(admin);
-        vm.expectRevert("mismatch underlying");
+        vm.expectRevert("mismatch market");
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
         ibToken = createIBToken(admin, address(ib), address(market));
 
-        vm.expectRevert("mismatch underlying");
+        vm.expectRevert("mismatch market");
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
         vm.stopPrank();
     }

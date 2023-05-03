@@ -31,9 +31,9 @@ contract DebtToken is Initializable, UUPSUpgradeable, OwnableUpgradeable, DebtTo
     /* ========== VIEW FUNCTIONS ========== */
 
     /**
-     * @notice Return the market
+     * @notice Return the underlying market.
      */
-    function getMarket() public view returns (address) {
+    function asset() public view returns (address) {
         return market;
     }
 

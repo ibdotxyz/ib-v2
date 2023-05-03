@@ -46,6 +46,7 @@ contract SupplyTest is Test, Common {
         market.approve(address(ib), supplyAmount);
 
         ib.supply(user1, user1, address(market), supplyAmount);
+        vm.stopPrank();
 
         assertEq(ibToken.balanceOf(user1), 100e18);
         assertEq(ibToken.totalSupply(), 100e18);
@@ -121,6 +122,7 @@ contract SupplyTest is Test, Common {
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
         ib.supply(user1, user1, address(market), supplyAmount);
+        vm.stopPrank();
     }
 
     function testCannotSupplyForUnauthorized() public {
