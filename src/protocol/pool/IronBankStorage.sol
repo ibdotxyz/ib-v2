@@ -10,6 +10,8 @@ contract IronBankStorage is Constants {
 
     event CreditLimitManagerSet(address manager);
 
+    event ReserveManagerSet(address manager);
+
     event CreditLimitChanged(address indexed user, address indexed market, uint256 credit);
 
     event PriceOracleSet(address priceOracle);
@@ -94,4 +96,5 @@ contract IronBankStorage is Constants {
 
     address public marketConfigurator;
     address public creditLimitManager;
+    address public reserveManager;
 }

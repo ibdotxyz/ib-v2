@@ -48,4 +48,10 @@ interface IronBankInterface {
     function isCreditAccount(address user) external view returns (bool);
 
     function setCreditLimit(address user, address market, uint256 credit) external;
+
+    /* ========== RESERVE MANAGER INTERFACES ========== */
+
+    function absorbToReserves(address market) external;
+
+    function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external;
 }

@@ -44,6 +44,11 @@ contract IronBank is
         _;
     }
 
+    modifier onlyReserveManager() {
+        _checkReserveManager();
+        _;
+    }
+
     modifier onlyCreditLimitManager() {
         require(msg.sender == creditLimitManager, "!manager");
         _;
@@ -375,25 +380,6 @@ contract IronBank is
         }
     }
 
-    function addToReserves(address market) external nonReentrant {
-        DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        _accrueInterest(market, m);
-
-        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
-
-        if (amount > 0) {
-            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
-
-            // Update total reserves and internal cash.
-            m.totalReserves += ibTokenAmount;
-            m.totalCash += amount;
-
-            emit ReservesIncreased(market, ibTokenAmount, amount);
-        }
-    }
-
     function setUserExtension(address extension, bool allowed) external nonReentrant {
         if (allowed && !allowedExtensions[msg.sender][extension]) {
             allowedExtensions[msg.sender][extension] = true;
@@ -480,6 +466,57 @@ contract IronBank is
         emit CreditLimitChanged(user, market, credit);
     }
 
+    /**
+     * @notice Increase reserves by absorbing the surplus cash.
+     * @param market The address of the market
+     */
+    function absorbToReserves(address market) external onlyReserveManager {
+        DataTypes.Market storage m = markets[market];
+        require(m.config.isListed, "not listed");
+
+        _accrueInterest(market, m);
+
+        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
+
+        if (amount > 0) {
+            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
+
+            // Update internal cash, total supply, and total reserves.
+            m.totalCash += amount;
+            m.totalSupply += ibTokenAmount;
+            m.totalReserves += ibTokenAmount;
+
+            emit ReservesIncreased(market, ibTokenAmount, amount);
+        }
+    }
+
+    /**
+     * @notice Reduce reserves by withdrawing the requested amount.
+     * @param market The address of the market
+     * @param ibTokenAmount The amount of ibToken to withdraw
+     * @param recipient The address which will receive the underlying asset
+     */
+    function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyReserveManager {
+        DataTypes.Market storage m = markets[market];
+        require(m.config.isListed, "not listed");
+
+        _accrueInterest(market, m);
+
+        uint256 amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
+
+        require(m.totalCash >= amount, "insufficient cash");
+        require(m.totalReserves >= ibTokenAmount, "insufficient reserves");
+
+        // Update internal cash, total supply, and total reserves.
+        m.totalCash -= amount;
+        m.totalSupply -= ibTokenAmount;
+        m.totalReserves -= ibTokenAmount;
+
+        IERC20(market).safeTransfer(recipient, amount);
+
+        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
+    }
+
     function setPriceOracle(address oracle) external onlyOwner {
         priceOracle = oracle;
 
@@ -498,36 +535,22 @@ contract IronBank is
         emit CreditLimitManagerSet(manager);
     }
 
+    function setReserveManager(address manager) external onlyOwner {
+        reserveManager = manager;
+
+        emit ReserveManagerSet(manager);
+    }
+
     function seize(address token, address recipient) external onlyOwner {
         DataTypes.Market storage m = markets[token];
+        require(!m.config.isListed, "cannot seize listed market");
 
         uint256 balance = IERC20(token).balanceOf(address(this));
-        if (m.config.isListed) {
-            balance -= m.totalCash;
-        }
         if (balance > 0) {
             IERC20(token).safeTransfer(recipient, balance);
 
             emit TokenSeized(token, recipient, balance);
         }
-    }
-
-    function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyOwner {
-        DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        _accrueInterest(market, m);
-
-        uint256 amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
-
-        require(m.totalCash >= amount, "insufficient cash");
-
-        // Update total reserves.
-        m.totalReserves -= ibTokenAmount;
-
-        IERC20(market).safeTransfer(recipient, amount);
-
-        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
@@ -551,6 +574,10 @@ contract IronBank is
 
     function _checkMarketConfigurator() internal view {
         require(msg.sender == marketConfigurator, "!configurator");
+    }
+
+    function _checkReserveManager() internal view {
+        require(msg.sender == reserveManager, "!reserveManager");
     }
 
     function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
