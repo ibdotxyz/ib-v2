@@ -181,8 +181,8 @@ contract IronBank is
         _accrueInterest(market, m);
 
         if (m.config.supplyCap != 0) {
-            uint256 totalSupply = m.totalSupply * _getExchangeRate(m) / 1e18;
-            require(totalSupply + amount <= m.config.supplyCap, "supply cap reached");
+            uint256 totalSupplyUnderlying = m.totalSupply * _getExchangeRate(m) / 1e18;
+            require(totalSupplyUnderlying + amount <= m.config.supplyCap, "supply cap reached");
         }
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
@@ -660,7 +660,7 @@ contract IronBank is
 
             emit InterestAccrued(
                 market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalSupply, totalReserves
-                );
+            );
         }
     }
 
