@@ -178,11 +178,12 @@ contract IronBank is
         require(!m.config.isSupplyPaused(), "supply paused");
         require(!isCreditAccount(to), "cannot supply to credit account");
 
-        if (m.config.supplyCap != 0) {
-            require(m.totalSupply + amount <= m.config.supplyCap, "supply cap reached");
-        }
-
         _accrueInterest(market, m);
+
+        if (m.config.supplyCap != 0) {
+            uint256 totalSupplyUnderlying = m.totalSupply * _getExchangeRate(m) / 1e18;
+            require(totalSupplyUnderlying + amount <= m.config.supplyCap, "supply cap reached");
+        }
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
 
@@ -220,11 +221,11 @@ contract IronBank is
         require(!m.config.isBorrowPaused(), "borrow paused");
         require(m.totalCash >= amount, "insufficient cash");
 
+        _accrueInterest(market, m);
+
         if (m.config.borrowCap != 0) {
             require(m.totalBorrow + amount <= m.config.borrowCap, "borrow cap reached");
         }
-
-        _accrueInterest(market, m);
 
         uint256 newUserBorrowBalance = _getBorrowBalance(m, from) + amount;
 
@@ -659,7 +660,7 @@ contract IronBank is
 
             emit InterestAccrued(
                 market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalSupply, totalReserves
-                );
+            );
         }
     }
 

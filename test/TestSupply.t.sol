@@ -6,15 +6,22 @@ import "forge-std/Test.sol";
 import "./Common.t.sol";
 
 contract SupplyTest is Test, Common {
-    uint8 internal constant underlyingDecimals = 18; // 1e18
     uint16 internal constant reserveFactor = 1000; // 10%
+
+    int256 internal constant market1Price = 1500e8;
+    int256 internal constant market2Price = 1500e8;
+    uint16 internal constant market2CollateralFactor = 8000; // 80%
 
     IronBank ib;
     MarketConfigurator configurator;
     CreditLimitManager creditLimitManager;
+    FeedRegistry registry;
+    PriceOracle oracle;
 
-    ERC20Market market;
-    IBToken ibToken;
+    ERC20Market market1;
+    ERC20Market market2;
+    IBToken ibToken1;
+    IBToken ibToken2;
 
     address admin = address(64);
     address user1 = address(128);
@@ -31,112 +38,122 @@ contract SupplyTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
-        (market, ibToken,) = createAndListERC20Market(underlyingDecimals, admin, ib, configurator, irm, reserveFactor);
+        (market1, ibToken1,) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
+        (market2, ibToken2,) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
+
+        registry = createRegistry();
+        oracle = createPriceOracle(admin, address(registry));
+        ib.setPriceOracle(address(oracle));
+
+        setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
+        setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.USD, market2Price);
+
+        configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
         vm.startPrank(admin);
-        market.transfer(user1, 10_000 * (10 ** underlyingDecimals));
-        market.transfer(user2, 10_000 * (10 ** underlyingDecimals));
+        market1.transfer(user1, 10000e18);
+        market1.transfer(user2, 10000e18);
         vm.stopPrank();
     }
 
     function testSupply() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.startPrank(user1);
-        market.approve(address(ib), supplyAmount);
+        market1.approve(address(ib), supplyAmount);
 
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
 
-        assertEq(ibToken.balanceOf(user1), 100e18);
-        assertEq(ibToken.totalSupply(), 100e18);
+        assertEq(ibToken1.balanceOf(user1), 100e18);
+        assertEq(ibToken1.totalSupply(), 100e18);
 
         fastForwardTime(86400);
 
         // Accrue no interest without borrows.
-        ib.accrueInterest(address(market));
-        assertEq(ibToken.balanceOf(user1), 100e18);
-        assertEq(ib.getSupplyBalance(user1, address(market)), 100e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market)));
+        ib.accrueInterest(address(market1));
+        assertEq(ibToken1.balanceOf(user1), 100e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 100e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
     }
 
     function testSupplyMultiple() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.startPrank(user1);
-        market.approve(address(ib), type(uint256).max);
-        ib.supply(user1, user1, address(market), supplyAmount);
+        market1.approve(address(ib), type(uint256).max);
+        ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user2);
-        market.approve(address(ib), type(uint256).max);
-        ib.supply(user2, user2, address(market), supplyAmount);
+        market1.approve(address(ib), type(uint256).max);
+        ib.supply(user2, user2, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
-        ib.supply(user1, user1, address(market), supplyAmount);
-        ib.supply(user1, user2, address(market), supplyAmount); // supply for user2
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        ib.supply(user1, user2, address(market1), supplyAmount); // supply for user2
         vm.stopPrank();
 
-        assertEq(ibToken.balanceOf(user1), 200e18);
-        assertEq(ib.getSupplyBalance(user1, address(market)), 200e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market)));
-        assertEq(ibToken.balanceOf(user2), 200e18);
-        assertEq(ib.getSupplyBalance(user2, address(market)), 200e18);
-        assertTrue(ib.isEnteredMarket(user2, address(market)));
-        assertEq(ibToken.totalSupply(), 400e18);
-        (,,,, uint256 totalSupply,,) = ib.markets(address(market));
+        assertEq(ibToken1.balanceOf(user1), 200e18);
+        assertEq(ib.getSupplyBalance(user1, address(market1)), 200e18);
+        assertTrue(ib.isEnteredMarket(user1, address(market1)));
+        assertEq(ibToken1.balanceOf(user2), 200e18);
+        assertEq(ib.getSupplyBalance(user2, address(market1)), 200e18);
+        assertTrue(ib.isEnteredMarket(user2, address(market1)));
+        assertEq(ibToken1.totalSupply(), 400e18);
+        (,,,, uint256 totalSupply,,) = ib.markets(address(market1));
         assertEq(totalSupply, 400e18);
     }
 
     function testSupplyOnBehalf() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.startPrank(user1);
-        market.approve(address(ib), supplyAmount);
+        market1.approve(address(ib), supplyAmount);
         ib.setUserExtension(user2, true);
         vm.stopPrank();
 
         vm.prank(user2);
-        ib.supply(user1, user2, address(market), supplyAmount);
+        ib.supply(user1, user2, address(market1), supplyAmount);
 
-        assertEq(ibToken.balanceOf(user2), 100e18);
-        assertEq(ibToken.totalSupply(), 100e18);
-        assertEq(ib.getSupplyBalance(user2, address(market)), 100e18);
-        assertTrue(ib.isEnteredMarket(user2, address(market)));
+        assertEq(ibToken1.balanceOf(user2), 100e18);
+        assertEq(ibToken1.totalSupply(), 100e18);
+        assertEq(ib.getSupplyBalance(user2, address(market1)), 100e18);
+        assertTrue(ib.isEnteredMarket(user2, address(market1)));
     }
 
     function testCannotSupplyForInsufficientAllowance() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.prank(user1);
         vm.expectRevert("ERC20: insufficient allowance");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
     }
 
     function testCannotSupplyForInsufficientBalance() public {
-        uint256 supplyAmount = 10_001 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 10001e18;
 
         vm.startPrank(user1);
-        market.approve(address(ib), supplyAmount);
+        market1.approve(address(ib), supplyAmount);
 
         vm.expectRevert("ERC20: transfer amount exceeds balance");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
     }
 
     function testCannotSupplyForUnauthorized() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.prank(user2);
         vm.expectRevert("!authorized");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
     }
 
     function testCannotSupplyForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.prank(user1);
         vm.expectRevert("not listed");
@@ -144,36 +161,63 @@ contract SupplyTest is Test, Common {
     }
 
     function testCannotSupplyForMarketSupplyPaused() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.prank(admin);
-        configurator.setMarketSupplyPaused(address(market), true);
+        configurator.setMarketSupplyPaused(address(market1), true);
 
         vm.prank(user1);
         vm.expectRevert("supply paused");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
     }
 
     function testCannotSupplyToCreditAccount() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
 
         vm.prank(admin);
-        creditLimitManager.setCreditLimit(user1, address(market), 1); // amount not important
+        creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
 
         vm.prank(user1);
         vm.expectRevert("cannot supply to credit account");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
     }
 
     function testCannotSupplyForSupplyCapReached() public {
-        uint256 supplyAmount = 100 * (10 ** underlyingDecimals);
-        uint256 supplyCap = 10 * (10 ** underlyingDecimals);
+        uint256 supplyAmount = 100e18;
+        uint256 supplyCap = 10e18;
 
         vm.prank(admin);
-        configurator.setMarketSupplyCaps(constructMarketCapArgument(address(market), supplyCap));
+        configurator.setMarketSupplyCaps(constructMarketCapArgument(address(market1), supplyCap));
 
         vm.prank(user1);
         vm.expectRevert("supply cap reached");
-        ib.supply(user1, user1, address(market), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+    }
+
+    function testCannotSupplyForSupplyCapReached2() public {
+        uint256 supplyCap = 10e18;
+        uint256 supplyAmount = supplyCap - 1; // supply almost to cap
+
+        vm.prank(admin);
+        configurator.setMarketSupplyCaps(constructMarketCapArgument(address(market1), supplyCap));
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        vm.stopPrank();
+
+        // Make some borrows.
+        vm.startPrank(admin);
+        market2.approve(address(ib), 10000e18);
+        ib.supply(admin, admin, address(market2), 10000e18);
+        ib.borrow(admin, admin, address(market1), 5e18);
+        vm.stopPrank();
+
+        fastForwardTime(86400);
+
+        // The total supply in underlying is now greater than the supply cap.
+        vm.prank(user1);
+        vm.expectRevert("supply cap reached");
+        ib.supply(user1, user1, address(market1), 1);
     }
 }
