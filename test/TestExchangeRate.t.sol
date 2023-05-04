@@ -106,8 +106,8 @@ contract ExchangeRateTest is Test, Common {
         ib.accrueInterest(address(market2));
         assertEq(ib.getExchangeRate(address(market2)), 1.000074e6);
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) =
-            ib.getMarketStatus(address(market2));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
+            ib.markets(address(market2));
         assertEq(totalCash, 200e6);
         assertEq(totalBorrow, 300.041472e6);
         assertEq(totalSupply, 500.00414669044955794e18);
@@ -135,7 +135,7 @@ contract ExchangeRateTest is Test, Common {
          */
         assertEq(ib.getExchangeRate(address(market2)), 1.07845e6);
 
-        (totalCash, totalBorrow, totalSupply, totalReserves) = ib.getMarketStatus(address(market2));
+        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market2));
         assertEq(totalCash, 0.004472e6);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, 0.00414669044955794e18);
@@ -157,7 +157,7 @@ contract ExchangeRateTest is Test, Common {
 
         assertEq(ib.getExchangeRate(address(market1)), 10 ** underlyingDecimals1);
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply,) = ib.getMarketStatus(address(market1));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply,,) = ib.markets(address(market1));
         assertEq(totalCash, 1);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, 1);
@@ -241,8 +241,8 @@ contract ExchangeRateTest is Test, Common {
         ib.accrueInterest(address(market1));
         assertEq(ib.getExchangeRate(address(market1)), 1.0000746496e18);
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) =
-            ib.getMarketStatus(address(market1));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
+            ib.markets(address(market1));
         assertEq(totalCash, 200e18);
         assertEq(totalBorrow, 300.041472e18);
         assertEq(totalSupply, 500.004146890436287687e18);
@@ -268,7 +268,7 @@ contract ExchangeRateTest is Test, Common {
          */
         assertEq(ib.getExchangeRate(address(market1)), 1.000074649600000072e18);
 
-        (totalCash, totalBorrow, totalSupply, totalReserves) = ib.getMarketStatus(address(market1));
+        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market1));
         assertEq(totalCash, 0.0041472e18);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, 0.004146890436287687e18);
@@ -311,8 +311,8 @@ contract ExchangeRateTest is Test, Common {
         ib.accrueInterest(address(market3));
         assertEq(ib.getExchangeRate(address(market3)), 1.000082944e18);
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) =
-            ib.getMarketStatus(address(market3));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
+            ib.markets(address(market3));
         assertEq(totalCash, 200e18);
         assertEq(totalBorrow, 300.041472e18);
         assertEq(totalSupply, 500e18);
@@ -337,7 +337,7 @@ contract ExchangeRateTest is Test, Common {
          */
         assertEq(ib.getExchangeRate(address(market3)), 1e18);
 
-        (totalCash, totalBorrow, totalSupply, totalReserves) = ib.getMarketStatus(address(market3));
+        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market3));
         assertEq(totalCash, 0);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, 0);
@@ -367,7 +367,8 @@ contract ExchangeRateTest is Test, Common {
          */
         assertEq(ib.getExchangeRate(address(market2)), 10 ** underlyingDecimals2);
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market2));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
+            ib.markets(address(market2));
         assertEq(totalCash, market2SupplyAmount);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, ibToken2.balanceOf(admin));
@@ -397,7 +398,8 @@ contract ExchangeRateTest is Test, Common {
         // exchange rate has been manipulated 10^12 times
         assertEq(ib.getExchangeRate(address(market2)), 10 ** (underlyingDecimals2 + 12));
 
-        (uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves) = ib.getMarketStatus(address(market2));
+        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
+            ib.markets(address(market2));
         assertEq(totalCash, 1);
         assertEq(totalBorrow, 0);
         assertEq(totalSupply, 1);
