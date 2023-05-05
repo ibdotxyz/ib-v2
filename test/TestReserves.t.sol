@@ -72,7 +72,7 @@ contract ReservesTest is Test, Common {
 
         assertEq(market.balanceOf(address(ib)), 300e18);
         assertEq(totalCash, 300e18);
-        assertEq(totalSupply, 300e18);
+        assertEq(totalSupply, 100e18);
         assertEq(totalReserves, 200e18);
         assertEq(exchangeRate, 1e18); // exchange rate is not affected
     }
@@ -140,7 +140,7 @@ contract ReservesTest is Test, Common {
 
         assertEq(market.balanceOf(address(ib)), 300e18);
         assertEq(totalCash, 300e18);
-        assertEq(totalSupply, 300e18);
+        assertEq(totalSupply, 100e18);
         assertEq(totalReserves, 200e18);
 
         ib.reduceReserves(address(market), 100e18, reserveManager);
@@ -149,7 +149,7 @@ contract ReservesTest is Test, Common {
 
         assertEq(market.balanceOf(address(ib)), 200e18);
         assertEq(totalCash, 200e18);
-        assertEq(totalSupply, 200e18);
+        assertEq(totalSupply, 100e18);
         assertEq(totalReserves, 100e18);
         assertEq(market.balanceOf(reserveManager), 100e18);
         vm.stopPrank();

@@ -32,7 +32,6 @@ contract IronBankStorage is Constants {
         uint256 borrowRatePerSecond,
         uint256 borrowIndex,
         uint256 totalBorrow,
-        uint256 totalSupply,
         uint256 totalReserves
     );
 

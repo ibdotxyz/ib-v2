@@ -481,9 +481,8 @@ contract IronBank is
         if (amount > 0) {
             uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
 
-            // Update internal cash, total supply, and total reserves.
+            // Update internal cash, and total reserves.
             m.totalCash += amount;
-            m.totalSupply += ibTokenAmount;
             m.totalReserves += ibTokenAmount;
 
             emit ReservesIncreased(market, ibTokenAmount, amount);
@@ -507,9 +506,8 @@ contract IronBank is
         require(m.totalCash >= amount, "insufficient cash");
         require(m.totalReserves >= ibTokenAmount, "insufficient reserves");
 
-        // Update internal cash, total supply, and total reserves.
+        // Update internal cash, and total reserves.
         m.totalCash -= amount;
-        m.totalSupply -= ibTokenAmount;
         m.totalReserves -= ibTokenAmount;
 
         IERC20(market).safeTransfer(recipient, amount);
@@ -581,10 +579,10 @@ contract IronBank is
     }
 
     function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
-        if (m.totalSupply == 0) {
+        if (m.totalSupply + m.totalReserves == 0) {
             return m.config.initialExchangeRate;
         }
-        return ((m.totalCash + m.totalBorrow) * 1e18) / m.totalSupply;
+        return ((m.totalCash + m.totalBorrow) * 1e18) / (m.totalSupply + m.totalReserves);
     }
 
     /**
@@ -665,28 +663,26 @@ contract IronBank is
             uint256 interestIncreased = (interestFactor * totalBorrow) / 1e18;
             uint256 feeIncreased = (interestIncreased * m.config.reserveFactor) / FACTOR_SCALE;
 
-            // Compute supplyIncreased.
-            uint256 supplyIncreased = 0;
+            // Compute reservesIncreased.
+            uint256 reservesIncreased = 0;
             if (feeIncreased > 0) {
-                supplyIncreased =
-                    (feeIncreased * totalSupply) / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
+                reservesIncreased = (feeIncreased * (totalSupply + totalReserves))
+                    / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
             }
 
             // Compute new states.
             borrowIndex += (interestFactor * borrowIndex) / 1e18;
             totalBorrow += interestIncreased;
-            totalSupply += supplyIncreased;
-            totalReserves += supplyIncreased;
+            totalReserves += reservesIncreased;
 
             // Update state variables.
             m.lastUpdateTimestamp = timestamp;
             m.borrowIndex = borrowIndex;
             m.totalBorrow = totalBorrow;
-            m.totalSupply = totalSupply;
             m.totalReserves = totalReserves;
 
             emit InterestAccrued(
-                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalSupply, totalReserves
+                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalReserves
             );
         }
     }

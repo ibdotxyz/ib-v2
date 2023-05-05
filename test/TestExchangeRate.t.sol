@@ -99,8 +99,8 @@ contract ExchangeRateTest is Test, Common {
          * fee increased = 0.041472 * 0.1 = 0.004147 (truncated)
          *
          * new total borrow = 300.041472
-         * new total supply = 500 * 500.041472 / (500.041472 - 0.004147) = 500.004146690449557940
-         * new total reserves = 500.004146690449557940 - 500 = 0.004146690449557940
+         * reserves increased = (500 + 0) * 0.004147 / (200 + 300.041472 - 0.004147) = 0.004146690449557940
+         * new total reserves = 0 + 0.004146690449557940 = 0.004146690449557940
          * new exchange rate = 500.041472 / 500.004146690449557940 = 1.000074
          */
         ib.accrueInterest(address(market2));
@@ -110,7 +110,7 @@ contract ExchangeRateTest is Test, Common {
             ib.markets(address(market2));
         assertEq(totalCash, 200e6);
         assertEq(totalBorrow, 300.041472e6);
-        assertEq(totalSupply, 500.00414669044955794e18);
+        assertEq(totalSupply, 500e18);
         assertEq(totalReserves, 0.00414669044955794e18);
 
         // Now market2 exchange rate is larger than 1. Repay the debt and redeem all to see how the exchange rate changes.
@@ -127,7 +127,7 @@ contract ExchangeRateTest is Test, Common {
          * admin market2 amount = 500 * 1.000074 = 500.037
          * total cash = 500.041472 - 500.037 = 0.004472
          * total borrow = 0
-         * total supply = 500.004146690449557940 - 500 = 0.004146690449557940
+         * total supply = 0
          * total reserve = 0.004146690449557940
          * new exchange rate = 0.004472 / 0.004146690449557940 = 1.078450
          *
@@ -138,7 +138,7 @@ contract ExchangeRateTest is Test, Common {
         (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market2));
         assertEq(totalCash, 0.004472e6);
         assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 0.00414669044955794e18);
+        assertEq(totalSupply, 0);
         assertEq(totalReserves, 0.00414669044955794e18);
     }
 
@@ -234,8 +234,8 @@ contract ExchangeRateTest is Test, Common {
          * fee increased = 0.041472 * 0.1 = 0.0041472
          *
          * new total borrow = 300.041472
-         * new total supply = 500 * 500.041472 / (500.041472 - 0.0041472) = 500.004146890436287687
-         * new total reserves = 500.004146890436287687 - 500 = 0.004146890436287687
+         * reserves increased = (500 + 0) * 0.0041472 / (200 + 300.041472 - 0.0041472) = 0.004146890436287687
+         * new total reserves = 0 + 0.004146890436287687 = 0.004146890436287687
          * new exchange rate = 500.041472 / 500.004146890436287687 = 1.0000746496
          */
         ib.accrueInterest(address(market1));
@@ -245,7 +245,7 @@ contract ExchangeRateTest is Test, Common {
             ib.markets(address(market1));
         assertEq(totalCash, 200e18);
         assertEq(totalBorrow, 300.041472e18);
-        assertEq(totalSupply, 500.004146890436287687e18);
+        assertEq(totalSupply, 500e18);
         assertEq(totalReserves, 0.004146890436287687e18);
 
         // Now market1 exchange rate is larger than 1. Repay the debt and redeem all to see how the exchange rate changes.
@@ -262,7 +262,7 @@ contract ExchangeRateTest is Test, Common {
          * admin market1 amount = 500 * 1.0000746496 = 500.0373248
          * total cash = 500.041472 - 500.0373248 = 0.0041472
          * total borrow = 0
-         * total supply = 500.004146890436287687 - 500 = 0.004146890436287687
+         * total supply = 0
          * total reserve = 0.004146890436287687
          * new exchange rate = 0.0041472 / 0.004146890436287687 = 1.000074649600000072
          */
@@ -271,7 +271,7 @@ contract ExchangeRateTest is Test, Common {
         (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market1));
         assertEq(totalCash, 0.0041472e18);
         assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 0.004146890436287687e18);
+        assertEq(totalSupply, 0);
         assertEq(totalReserves, 0.004146890436287687e18);
     }
 
