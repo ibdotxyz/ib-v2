@@ -44,6 +44,11 @@ contract IronBank is
         _;
     }
 
+    modifier onlyReserveManager() {
+        _checkReserveManager();
+        _;
+    }
+
     modifier onlyCreditLimitManager() {
         require(msg.sender == creditLimitManager, "!manager");
         _;
@@ -375,25 +380,6 @@ contract IronBank is
         }
     }
 
-    function addToReserves(address market) external nonReentrant {
-        DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        _accrueInterest(market, m);
-
-        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
-
-        if (amount > 0) {
-            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
-
-            // Update total reserves and internal cash.
-            m.totalReserves += ibTokenAmount;
-            m.totalCash += amount;
-
-            emit ReservesIncreased(market, ibTokenAmount, amount);
-        }
-    }
-
     function setUserExtension(address extension, bool allowed) external nonReentrant {
         if (allowed && !allowedExtensions[msg.sender][extension]) {
             allowedExtensions[msg.sender][extension] = true;
@@ -480,6 +466,55 @@ contract IronBank is
         emit CreditLimitChanged(user, market, credit);
     }
 
+    /**
+     * @notice Increase reserves by absorbing the surplus cash.
+     * @param market The address of the market
+     */
+    function absorbToReserves(address market) external onlyReserveManager {
+        DataTypes.Market storage m = markets[market];
+        require(m.config.isListed, "not listed");
+
+        _accrueInterest(market, m);
+
+        uint256 amount = IERC20(market).balanceOf(address(this)) - m.totalCash;
+
+        if (amount > 0) {
+            uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
+
+            // Update internal cash, and total reserves.
+            m.totalCash += amount;
+            m.totalReserves += ibTokenAmount;
+
+            emit ReservesIncreased(market, ibTokenAmount, amount);
+        }
+    }
+
+    /**
+     * @notice Reduce reserves by withdrawing the requested amount.
+     * @param market The address of the market
+     * @param ibTokenAmount The amount of ibToken to withdraw
+     * @param recipient The address which will receive the underlying asset
+     */
+    function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyReserveManager {
+        DataTypes.Market storage m = markets[market];
+        require(m.config.isListed, "not listed");
+
+        _accrueInterest(market, m);
+
+        uint256 amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
+
+        require(m.totalCash >= amount, "insufficient cash");
+        require(m.totalReserves >= ibTokenAmount, "insufficient reserves");
+
+        // Update internal cash, and total reserves.
+        m.totalCash -= amount;
+        m.totalReserves -= ibTokenAmount;
+
+        IERC20(market).safeTransfer(recipient, amount);
+
+        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
+    }
+
     function setPriceOracle(address oracle) external onlyOwner {
         priceOracle = oracle;
 
@@ -498,36 +533,22 @@ contract IronBank is
         emit CreditLimitManagerSet(manager);
     }
 
+    function setReserveManager(address manager) external onlyOwner {
+        reserveManager = manager;
+
+        emit ReserveManagerSet(manager);
+    }
+
     function seize(address token, address recipient) external onlyOwner {
         DataTypes.Market storage m = markets[token];
+        require(!m.config.isListed, "cannot seize listed market");
 
         uint256 balance = IERC20(token).balanceOf(address(this));
-        if (m.config.isListed) {
-            balance -= m.totalCash;
-        }
         if (balance > 0) {
             IERC20(token).safeTransfer(recipient, balance);
 
             emit TokenSeized(token, recipient, balance);
         }
-    }
-
-    function reduceReserves(address market, uint256 ibTokenAmount, address recipient) external onlyOwner {
-        DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        _accrueInterest(market, m);
-
-        uint256 amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
-
-        require(m.totalCash >= amount, "insufficient cash");
-
-        // Update total reserves.
-        m.totalReserves -= ibTokenAmount;
-
-        IERC20(market).safeTransfer(recipient, amount);
-
-        emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
@@ -553,11 +574,15 @@ contract IronBank is
         require(msg.sender == marketConfigurator, "!configurator");
     }
 
+    function _checkReserveManager() internal view {
+        require(msg.sender == reserveManager, "!reserveManager");
+    }
+
     function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
-        if (m.totalSupply == 0) {
+        if (m.totalSupply + m.totalReserves == 0) {
             return m.config.initialExchangeRate;
         }
-        return ((m.totalCash + m.totalBorrow) * 1e18) / m.totalSupply;
+        return ((m.totalCash + m.totalBorrow) * 1e18) / (m.totalSupply + m.totalReserves);
     }
 
     /**
@@ -638,28 +663,26 @@ contract IronBank is
             uint256 interestIncreased = (interestFactor * totalBorrow) / 1e18;
             uint256 feeIncreased = (interestIncreased * m.config.reserveFactor) / FACTOR_SCALE;
 
-            // Compute supplyIncreased.
-            uint256 supplyIncreased = 0;
+            // Compute reservesIncreased.
+            uint256 reservesIncreased = 0;
             if (feeIncreased > 0) {
-                supplyIncreased =
-                    (feeIncreased * totalSupply) / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
+                reservesIncreased = (feeIncreased * (totalSupply + totalReserves))
+                    / (totalCash + totalBorrow + (interestIncreased - feeIncreased));
             }
 
             // Compute new states.
             borrowIndex += (interestFactor * borrowIndex) / 1e18;
             totalBorrow += interestIncreased;
-            totalSupply += supplyIncreased;
-            totalReserves += supplyIncreased;
+            totalReserves += reservesIncreased;
 
             // Update state variables.
             m.lastUpdateTimestamp = timestamp;
             m.borrowIndex = borrowIndex;
             m.totalBorrow = totalBorrow;
-            m.totalSupply = totalSupply;
             m.totalReserves = totalReserves;
 
             emit InterestAccrued(
-                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalSupply, totalReserves
+                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalReserves
             );
         }
     }
