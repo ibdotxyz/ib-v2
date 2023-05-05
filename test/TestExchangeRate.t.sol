@@ -32,14 +32,19 @@ contract ExchangeRateTest is Test, Common {
 
     address admin = address(64);
     address user1 = address(128);
+    address reserveManager = address(256);
 
     function setUp() public {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -52,6 +57,8 @@ contract ExchangeRateTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -60,6 +67,9 @@ contract ExchangeRateTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
+
+        vm.prank(admin);
+        ib.setReserveManager(reserveManager);
 
         vm.startPrank(admin);
         market1.transfer(user1, 10_000 * (10 ** underlyingDecimals1));
@@ -105,13 +115,10 @@ contract ExchangeRateTest is Test, Common {
          */
         ib.accrueInterest(address(market2));
         assertEq(ib.getExchangeRate(address(market2)), 1.000074e6);
-
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
-            ib.markets(address(market2));
-        assertEq(totalCash, 200e6);
-        assertEq(totalBorrow, 300.041472e6);
-        assertEq(totalSupply, 500e18);
-        assertEq(totalReserves, 0.00414669044955794e18);
+        assertEq(ib.getTotalCash(address(market2)), 200e6);
+        assertEq(ib.getTotalBorrow(address(market2)), 300.041472e6);
+        assertEq(ib.getTotalSupply(address(market2)), 500e18);
+        assertEq(ib.getTotalReserves(address(market2)), 0.00414669044955794e18);
 
         // Now market2 exchange rate is larger than 1. Repay the debt and redeem all to see how the exchange rate changes.
 
@@ -134,12 +141,10 @@ contract ExchangeRateTest is Test, Common {
          * (In this case, the exchange rate will grow quite a lot when the market decimals is much smaller than 1e18.)
          */
         assertEq(ib.getExchangeRate(address(market2)), 1.07845e6);
-
-        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market2));
-        assertEq(totalCash, 0.004472e6);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 0);
-        assertEq(totalReserves, 0.00414669044955794e18);
+        assertEq(ib.getTotalCash(address(market2)), 0.004472e6);
+        assertEq(ib.getTotalBorrow(address(market2)), 0);
+        assertEq(ib.getTotalSupply(address(market2)), 0);
+        assertEq(ib.getTotalReserves(address(market2)), 0.00414669044955794e18);
     }
 
     function testExchangeRate1e18SupplyAndRedeem() public {
@@ -156,11 +161,9 @@ contract ExchangeRateTest is Test, Common {
         vm.stopPrank();
 
         assertEq(ib.getExchangeRate(address(market1)), 10 ** underlyingDecimals1);
-
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply,,) = ib.markets(address(market1));
-        assertEq(totalCash, 1);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 1);
+        assertEq(ib.getTotalCash(address(market1)), 1);
+        assertEq(ib.getTotalBorrow(address(market1)), 0);
+        assertEq(ib.getTotalSupply(address(market1)), 1);
     }
 
     function testExchangeRate1e18SupplyAndRedeem2() public {
@@ -240,13 +243,10 @@ contract ExchangeRateTest is Test, Common {
          */
         ib.accrueInterest(address(market1));
         assertEq(ib.getExchangeRate(address(market1)), 1.0000746496e18);
-
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
-            ib.markets(address(market1));
-        assertEq(totalCash, 200e18);
-        assertEq(totalBorrow, 300.041472e18);
-        assertEq(totalSupply, 500e18);
-        assertEq(totalReserves, 0.004146890436287687e18);
+        assertEq(ib.getTotalCash(address(market1)), 200e18);
+        assertEq(ib.getTotalBorrow(address(market1)), 300.041472e18);
+        assertEq(ib.getTotalSupply(address(market1)), 500e18);
+        assertEq(ib.getTotalReserves(address(market1)), 0.004146890436287687e18);
 
         // Now market1 exchange rate is larger than 1. Repay the debt and redeem all to see how the exchange rate changes.
 
@@ -267,12 +267,10 @@ contract ExchangeRateTest is Test, Common {
          * new exchange rate = 0.0041472 / 0.004146890436287687 = 1.000074649600000072
          */
         assertEq(ib.getExchangeRate(address(market1)), 1.000074649600000072e18);
-
-        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market1));
-        assertEq(totalCash, 0.0041472e18);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 0);
-        assertEq(totalReserves, 0.004146890436287687e18);
+        assertEq(ib.getTotalCash(address(market1)), 0.0041472e18);
+        assertEq(ib.getTotalBorrow(address(market1)), 0);
+        assertEq(ib.getTotalSupply(address(market1)), 0);
+        assertEq(ib.getTotalReserves(address(market1)), 0.004146890436287687e18);
     }
 
     function testExchangeRate1e18SupplyAndBorrowNoReserve() public {
@@ -310,13 +308,10 @@ contract ExchangeRateTest is Test, Common {
          */
         ib.accrueInterest(address(market3));
         assertEq(ib.getExchangeRate(address(market3)), 1.000082944e18);
-
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
-            ib.markets(address(market3));
-        assertEq(totalCash, 200e18);
-        assertEq(totalBorrow, 300.041472e18);
-        assertEq(totalSupply, 500e18);
-        assertEq(totalReserves, 0);
+        assertEq(ib.getTotalCash(address(market3)), 200e18);
+        assertEq(ib.getTotalBorrow(address(market3)), 300.041472e18);
+        assertEq(ib.getTotalSupply(address(market3)), 500e18);
+        assertEq(ib.getTotalReserves(address(market3)), 0);
 
         // Now market3 exchange rate is larger than 1. Repay the debt and redeem all to see how the exchange rate changes.
 
@@ -336,12 +331,10 @@ contract ExchangeRateTest is Test, Common {
          * new exchange rate = 1
          */
         assertEq(ib.getExchangeRate(address(market3)), 1e18);
-
-        (,, totalCash, totalBorrow, totalSupply, totalReserves,) = ib.markets(address(market3));
-        assertEq(totalCash, 0);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 0);
-        assertEq(totalReserves, 0);
+        assertEq(ib.getTotalCash(address(market3)), 0);
+        assertEq(ib.getTotalBorrow(address(market3)), 0);
+        assertEq(ib.getTotalSupply(address(market3)), 0);
+        assertEq(ib.getTotalReserves(address(market3)), 0);
     }
 
     function testExchangeRate1e6ManipulationFailed() public {
@@ -366,13 +359,10 @@ contract ExchangeRateTest is Test, Common {
          * new exchange rate = 10 / 9.999999000000000001 = 1.000000_1 (truncate to 1e6)
          */
         assertEq(ib.getExchangeRate(address(market2)), 10 ** underlyingDecimals2);
-
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
-            ib.markets(address(market2));
-        assertEq(totalCash, market2SupplyAmount);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, ibToken2.balanceOf(admin));
-        assertEq(totalReserves, 0);
+        assertEq(ib.getTotalCash(address(market2)), market2SupplyAmount);
+        assertEq(ib.getTotalBorrow(address(market2)), 0);
+        assertEq(ib.getTotalSupply(address(market2)), ibToken2.balanceOf(admin));
+        assertEq(ib.getTotalReserves(address(market2)), 0);
     }
 
     function testExchangeRate1e6Manipulation() public {
@@ -397,12 +387,32 @@ contract ExchangeRateTest is Test, Common {
          */
         // exchange rate has been manipulated 10^12 times
         assertEq(ib.getExchangeRate(address(market2)), 10 ** (underlyingDecimals2 + 12));
+        assertEq(ib.getTotalCash(address(market2)), 1);
+        assertEq(ib.getTotalBorrow(address(market2)), 0);
+        assertEq(ib.getTotalSupply(address(market2)), 1);
+        assertEq(ib.getTotalReserves(address(market2)), 0);
+    }
 
-        (,, uint256 totalCash, uint256 totalBorrow, uint256 totalSupply, uint256 totalReserves,) =
-            ib.markets(address(market2));
-        assertEq(totalCash, 1);
-        assertEq(totalBorrow, 0);
-        assertEq(totalSupply, 1);
-        assertEq(totalReserves, 0);
+    function testExchangeRate1e18OnlyReserves() public {
+        uint256 donateAmount = 100 * (10 ** underlyingDecimals1);
+
+        vm.prank(admin);
+        market1.transfer(address(ib), donateAmount);
+
+        vm.prank(reserveManager);
+        ib.absorbToReserves(address(market1));
+
+        /**
+         * total cash = 100
+         * total borrow = 0
+         * total supply = 0
+         * total reserves = 100
+         * exchange rate = 1
+         */
+        assertEq(ib.getExchangeRate(address(market1)), 1e18);
+        assertEq(ib.getTotalCash(address(market1)), 100e18);
+        assertEq(ib.getTotalBorrow(address(market1)), 0);
+        assertEq(ib.getTotalSupply(address(market1)), 0);
+        assertEq(ib.getTotalReserves(address(market1)), 100e18);
     }
 }

@@ -31,9 +31,13 @@ contract BorrowTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -43,6 +47,8 @@ contract BorrowTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -68,6 +74,10 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Borrow(address(market2), user1, user1, market2BorrowAmount, market2BorrowAmount, market2BorrowAmount);
+
         ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
@@ -105,6 +115,10 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Borrow(address(market2), user1, user2, market2BorrowAmount, market2BorrowAmount, market2BorrowAmount);
+
         ib.borrow(user1, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
@@ -147,6 +161,9 @@ contract BorrowTest is Test, Common {
         vm.stopPrank();
 
         vm.prank(user2);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Borrow(address(market2), user1, user1, market2BorrowAmount, market2BorrowAmount, market2BorrowAmount);
+
         ib.borrow(user1, user1, address(market2), market2BorrowAmount);
 
         assertEq(market2.balanceOf(user1), market2BorrowAmount);
@@ -182,6 +199,10 @@ contract BorrowTest is Test, Common {
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Borrow(address(market2), user1, user1, market2BorrowAmount, market2BorrowAmount, market2BorrowAmount);
+
         ib.borrow(user1, user1, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
@@ -221,6 +242,9 @@ contract BorrowTest is Test, Common {
         creditLimitManager.setCreditLimit(user1, address(market2), borrowAmount);
 
         vm.prank(user1);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Borrow(address(market2), user1, user1, borrowAmount, borrowAmount, borrowAmount);
+
         ib.borrow(user1, user1, address(market2), borrowAmount);
 
         uint256 userBorrowBalance = ib.getBorrowBalance(user1, address(market2));

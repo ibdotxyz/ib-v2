@@ -32,9 +32,13 @@ contract AccountLiquidityTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -49,6 +53,8 @@ contract AccountLiquidityTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);

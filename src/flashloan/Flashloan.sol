@@ -27,7 +27,9 @@ contract Flashloan is IERC3156FlashLender, DeferLiquidityCheckInterface {
             return 0;
         }
 
-        (DataTypes.MarketConfig memory config,, uint256 totalCash, uint256 totalBorrow,,,) = ironBank.markets(token);
+        DataTypes.MarketConfig memory config = ironBank.getMarketConfiguration(token);
+        uint256 totalCash = ironBank.getTotalCash(token);
+        uint256 totalBorrow = ironBank.getTotalBorrow(token);
 
         uint256 maxBorrowAmount;
         if (config.borrowCap == 0) {

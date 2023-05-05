@@ -8,6 +8,7 @@ import "../src/extensions/IronBankExtension.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
+import "../src/protocol/pool/Events.sol";
 import "../src/protocol/pool/IronBank.sol";
 import "../src/protocol/pool/IronBankProxy.sol";
 import "../src/protocol/pool/MarketConfigurator.sol";
@@ -17,7 +18,7 @@ import "../src/protocol/token/PToken.sol";
 import "./MockToken.t.sol";
 import "./MockFeedRegistry.t.sol";
 
-abstract contract Common is Test {
+abstract contract Common is Test, Events {
     function fastForwardBlocks(uint256 blocks) internal {
         vm.roll(block.number + blocks);
     }
@@ -41,6 +42,8 @@ abstract contract Common is Test {
         IronBankProxy proxy = new IronBankProxy(address(impl), "");
         IronBank ib = IronBank(address(proxy));
         ib.initialize(_admin);
+        vm.prank(_admin);
+        ib.acceptOwnership();
         return ib;
     }
 

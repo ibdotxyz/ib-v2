@@ -61,23 +61,72 @@ contract IronBank is
 
     /* ========== VIEW FUNCTIONS ========== */
 
+    /**
+     * @notice Get all markets.
+     * @return The list of all markets
+     */
     function getAllMarkets() public view returns (address[] memory) {
         return allMarkets;
     }
 
+    /**
+     * @notice Whether or not a market is listed.
+     * @param market The address of the market to check
+     * @return true if the market is listed, false otherwise
+     */
+    function isMarketListed(address market) public view returns (bool) {
+        DataTypes.Market storage m = markets[market];
+        return m.config.isListed;
+    }
+
+    /**
+     * @notice Get the exchange rate of a market.
+     * @param market The address of the market
+     * @return The exchange rate
+     */
     function getExchangeRate(address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
         return _getExchangeRate(m);
     }
 
+    /**
+     * @notice Get the total supply of a market.
+     * @param market The address of the market
+     * @return The total supply
+     */
+    function getTotalSupply(address market) public view returns (uint256) {
+        DataTypes.Market storage m = markets[market];
+        return m.totalSupply;
+    }
+
+    /**
+     * @notice Get the total borrow of a market.
+     * @param market The address of the market
+     * @return The total borrow
+     */
     function getTotalBorrow(address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
         return m.totalBorrow;
     }
 
-    function isMarketListed(address market) public view returns (bool) {
+    /**
+     * @notice Get the total cash of a market.
+     * @param market The address of the market
+     * @return The total cash
+     */
+    function getTotalCash(address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
-        return m.config.isListed;
+        return m.totalCash;
+    }
+
+    /**
+     * @notice Get the total reserves of a market.
+     * @param market The address of the market
+     * @return The total reserves
+     */
+    function getTotalReserves(address market) public view returns (uint256) {
+        DataTypes.Market storage m = markets[market];
+        return m.totalReserves;
     }
 
     function getBorrowBalance(address user, address market) public view returns (uint256) {
@@ -380,6 +429,11 @@ contract IronBank is
         }
     }
 
+    /**
+     * @notice User enables or disables an extension.
+     * @param extension The address of the extension
+     * @param allowed Whether to allow or disallow the extension
+     */
     function setUserExtension(address extension, bool allowed) external nonReentrant {
         if (allowed && !allowedExtensions[msg.sender][extension]) {
             allowedExtensions[msg.sender][extension] = true;
@@ -515,30 +569,51 @@ contract IronBank is
         emit ReservesDecreased(market, recipient, ibTokenAmount, amount);
     }
 
+    /**
+     * @notice Set the price oracle.
+     * @param oracle The address of the price oracle
+     */
     function setPriceOracle(address oracle) external onlyOwner {
         priceOracle = oracle;
 
         emit PriceOracleSet(oracle);
     }
 
+    /**
+     * @notice Set the market configurator.
+     * @param configurator The address of the market configurator
+     */
     function setMarketConfigurator(address configurator) external onlyOwner {
         marketConfigurator = configurator;
 
         emit MarketConfiguratorSet(configurator);
     }
 
+    /**
+     * @notice Set the credit limit manager.
+     * @param manager The address of the credit limit manager
+     */
     function setCreditLimitManager(address manager) external onlyOwner {
         creditLimitManager = manager;
 
         emit CreditLimitManagerSet(manager);
     }
 
+    /**
+     * @notice Set the reserve manager.
+     * @param manager The address of the reserve manager
+     */
     function setReserveManager(address manager) external onlyOwner {
         reserveManager = manager;
 
         emit ReserveManagerSet(manager);
     }
 
+    /**
+     * @notice Seize the unlisted token.
+     * @param token The address of the token
+     * @param recipient The address which will receive the token
+     */
     function seize(address token, address recipient) external onlyOwner {
         DataTypes.Market storage m = markets[token];
         require(!m.config.isListed, "cannot seize listed market");
@@ -681,9 +756,7 @@ contract IronBank is
             m.totalBorrow = totalBorrow;
             m.totalReserves = totalReserves;
 
-            emit InterestAccrued(
-                market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalReserves
-            );
+            emit InterestAccrued(market, timestamp, borrowRatePerSecond, borrowIndex, totalBorrow, totalReserves);
         }
     }
 

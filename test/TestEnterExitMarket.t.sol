@@ -35,9 +35,13 @@ contract EnterExitMarketTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -49,6 +53,8 @@ contract EnterExitMarketTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -71,12 +77,24 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market2), user2);
+
         ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user1);
+
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market2), user1);
+
         ib.borrow(user1, user1, address(market2), market2BorrowAmount);
 
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
@@ -95,17 +113,36 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), market2BorrowAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market2), user2);
+
         ib.supply(user2, user2, address(market2), market2BorrowAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user1);
+
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market2), user1);
+
         ib.borrow(user1, user1, address(market2), market2BorrowAmount);
 
         market2.approve(address(ib), type(uint256).max);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketExited(address(market2), user1);
+
         ib.repay(user1, user1, address(market2), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market2)));
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketExited(address(market1), user1);
 
         ib.redeem(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
@@ -116,8 +153,17 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user1);
+
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user2);
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketExited(address(market1), user1);
 
         ibToken1.transfer(user2, ibToken1.balanceOf(user1));
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
@@ -131,6 +177,10 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user1);
+
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
         ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
@@ -140,6 +190,9 @@ contract EnterExitMarketTest is Test, Common {
         assertTrue(ib.getSupplyBalance(user1, address(market1)) > 0);
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketExited(address(market1), user1);
 
         ib.redeem(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
@@ -154,6 +207,10 @@ contract EnterExitMarketTest is Test, Common {
         vm.startPrank(admin);
         // Faucet some market1 for user1 to redeem full later.
         market1.approve(address(ib), market1SupplyAmount);
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketEntered(address(market1), user1);
+
         ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
@@ -170,6 +227,9 @@ contract EnterExitMarketTest is Test, Common {
         assertEq(ib.getSupplyBalance(user1, address(market1)), 0);
         assertTrue(ib.getBorrowBalance(user1, address(market1)) > 0);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
+
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit MarketExited(address(market1), user1);
 
         ib.repay(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));

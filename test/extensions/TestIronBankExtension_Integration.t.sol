@@ -44,9 +44,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -56,6 +60,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         createAndListERC20Market(USDT, admin, ib, configurator, irm, reserveFactor);
 
         oracle = createPriceOracle(admin, feedRegistry);
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, admin, WETH, Denominations.ETH, Denominations.USD);

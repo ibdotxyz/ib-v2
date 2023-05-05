@@ -31,9 +31,13 @@ contract SupplyTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -43,6 +47,8 @@ contract SupplyTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -61,6 +67,9 @@ contract SupplyTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), supplyAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user1, user1, supplyAmount, supplyAmount);
 
         ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
@@ -82,16 +91,32 @@ contract SupplyTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user1, user1, supplyAmount, supplyAmount);
+
         ib.supply(user1, user1, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user2);
         market1.approve(address(ib), type(uint256).max);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user2, user2, supplyAmount, supplyAmount);
+
         ib.supply(user2, user2, address(market1), supplyAmount);
         vm.stopPrank();
 
         vm.startPrank(user1);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user1, user1, supplyAmount, supplyAmount);
+
         ib.supply(user1, user1, address(market1), supplyAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user1, user2, supplyAmount, supplyAmount);
+
         ib.supply(user1, user2, address(market1), supplyAmount); // supply for user2
         vm.stopPrank();
 
@@ -102,8 +127,7 @@ contract SupplyTest is Test, Common {
         assertEq(ib.getSupplyBalance(user2, address(market1)), 200e18);
         assertTrue(ib.isEnteredMarket(user2, address(market1)));
         assertEq(ibToken1.totalSupply(), 400e18);
-        (,,,, uint256 totalSupply,,) = ib.markets(address(market1));
-        assertEq(totalSupply, 400e18);
+        assertEq(ib.getTotalSupply(address(market1)), 400e18);
     }
 
     function testSupplyOnBehalf() public {
@@ -115,6 +139,10 @@ contract SupplyTest is Test, Common {
         vm.stopPrank();
 
         vm.prank(user2);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Supply(address(market1), user1, user2, supplyAmount, supplyAmount);
+
         ib.supply(user1, user2, address(market1), supplyAmount);
 
         assertEq(ibToken1.balanceOf(user2), 100e18);

@@ -22,6 +22,8 @@ contract ListDelistTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         irm = createDefaultIRM();

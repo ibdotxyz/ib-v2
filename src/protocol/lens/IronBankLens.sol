@@ -274,14 +274,11 @@ contract IronBankLens is Constants {
         view
         returns (MarketStatus memory)
     {
-        (
-            DataTypes.MarketConfig memory config,
-            ,
-            uint256 totalCash,
-            uint256 totalBorrow,
-            uint256 totalSupply,
-            uint256 totalReserves,
-        ) = ironBank.markets(market);
+        DataTypes.MarketConfig memory config = ironBank.getMarketConfiguration(market);
+        uint256 totalCash = ironBank.getTotalCash(market);
+        uint256 totalBorrow = ironBank.getTotalBorrow(market);
+        uint256 totalSupply = ironBank.getTotalSupply(market);
+        uint256 totalReserves = ironBank.getTotalReserves(market);
 
         InterestRateModelInterface irm = InterestRateModelInterface(config.interestRateModelAddress);
 

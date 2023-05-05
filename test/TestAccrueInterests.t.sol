@@ -33,9 +33,13 @@ contract AccrueInterestTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -47,6 +51,8 @@ contract AccrueInterestTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -79,9 +85,20 @@ contract AccrueInterestTest is Test, Common {
         ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         vm.stopPrank();
 
-        (,,, uint256 totalBorrow,, uint256 totalReserves,) = ib.markets(address(market1));
+        uint256 totalBorrow = ib.getTotalBorrow(address(market1));
+        uint256 totalReserves = ib.getTotalReserves(address(market1));
 
         fastForwardTime(86400);
+
+        vm.expectEmit(true, false, false, true, address(ib));
+        emit InterestAccrued(
+            address(market1),
+            uint40(block.timestamp),
+            0.0000000016e18,
+            1.00013824e18, // 0.0000000016 * 86400
+            300.041472e18,
+            0.004146890436287687e18
+        );
 
         /**
          * utilization = 300 / 500 = 60% < kink1 = 80%
@@ -94,13 +111,15 @@ contract AccrueInterestTest is Test, Common {
          * new total reserves = 0 + 0.004146890436287687 = 0.004146890436287687
          */
         ib.accrueInterest(address(market1));
-        (,,, uint256 newTotalBorrow,, uint256 newTotalReserves,) = ib.markets(address(market1));
+        uint256 newTotalBorrow = ib.getTotalBorrow(address(market1));
+        uint256 newTotalReserves = ib.getTotalReserves(address(market1));
         assertEq(newTotalBorrow - totalBorrow, 0.041472e18);
         assertEq(newTotalReserves - totalReserves, 0.004146890436287687e18);
 
         // Accrue interests again. Nothing will change.
         ib.accrueInterest(address(market1));
-        (,,, uint256 newTotalBorrow2,, uint256 newTotalReserves2,) = ib.markets(address(market1));
+        uint256 newTotalBorrow2 = ib.getTotalBorrow(address(market1));
+        uint256 newTotalReserves2 = ib.getTotalReserves(address(market1));
         assertEq(newTotalBorrow, newTotalBorrow2);
         assertEq(newTotalReserves, newTotalReserves2);
     }
@@ -113,12 +132,24 @@ contract AccrueInterestTest is Test, Common {
         ib.supply(admin, admin, address(market1), supplyAmount);
         vm.stopPrank();
 
-        (,,, uint256 totalBorrow,, uint256 totalReserves,) = ib.markets(address(market1));
+        uint256 totalBorrow = ib.getTotalBorrow(address(market1));
+        uint256 totalReserves = ib.getTotalReserves(address(market1));
 
         fastForwardTime(86400);
 
+        vm.expectEmit(true, false, false, true, address(ib));
+        emit InterestAccrued(
+            address(market1),
+            uint40(block.timestamp),
+            0.000000001e18, // base borrow rate
+            1.0000864e18, // 0.000000001 * 86400
+            0,
+            0
+        );
+
         ib.accrueInterest(address(market1));
-        (,,, uint256 newTotalBorrow,, uint256 newTotalReserves,) = ib.markets(address(market1));
+        uint256 newTotalBorrow = ib.getTotalBorrow(address(market1));
+        uint256 newTotalReserves = ib.getTotalReserves(address(market1));
 
         assertEq(newTotalBorrow, totalBorrow);
         assertEq(newTotalReserves, totalReserves);
