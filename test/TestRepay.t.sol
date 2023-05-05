@@ -29,9 +29,13 @@ contract RepayTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -41,6 +45,8 @@ contract RepayTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -76,6 +82,10 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Repay(address(market1), user1, user1, repayAmount, 200.041472e18, 200.041472e18);
+
         ib.repay(user1, user1, address(market1), repayAmount);
         vm.stopPrank();
 
@@ -97,6 +107,10 @@ contract RepayTest is Test, Common {
 
         vm.startPrank(user2);
         market1.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Repay(address(market1), user2, user1, repayAmount, 100.065669876518786214e18, 100.065669876518786242e18); // account borrow != total borrow
+
         ib.repay(user2, user1, address(market1), repayAmount);
         vm.stopPrank();
 
@@ -127,6 +141,9 @@ contract RepayTest is Test, Common {
         vm.stopPrank();
 
         vm.prank(user2);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Repay(address(market1), user1, user1, 100.076045593468789831e18, 0, 83); // total borrow not 0
+
         ib.repay(user1, user1, address(market1), type(uint256).max);
 
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);

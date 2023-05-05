@@ -31,9 +31,13 @@ contract LiquidateTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         irm = createDefaultIRM();
@@ -43,6 +47,8 @@ contract LiquidateTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -117,6 +123,10 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market1), repayAmount, 20e18);
+
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
 
         ib.redeem(user2, user2, address(market1), type(uint256).max);
@@ -144,6 +154,10 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market1), 400e18, 80e18);
+
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
 
         ib.redeem(user2, user2, address(market1), type(uint256).max);
@@ -191,6 +205,10 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market1), repayAmount, 99e18);
+
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
 
         ib.redeem(user2, user2, address(market1), type(uint256).max);
@@ -245,6 +263,10 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market1), repayAmount, 55e18);
+
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
 
         ib.redeem(user2, user2, address(market1), type(uint256).max);
@@ -311,6 +333,10 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market3), repayAmount, 55e18);
+
         ib.liquidate(user2, user1, address(market2), address(market3), repayAmount);
 
         ib.redeem(user2, user2, address(market3), type(uint256).max);

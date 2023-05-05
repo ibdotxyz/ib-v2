@@ -22,6 +22,8 @@ contract MarketConfiguratorTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         irm = createDefaultIRM();
@@ -36,6 +38,10 @@ contract MarketConfiguratorTest is Test, Common {
 
         vm.prank(admin);
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
+    }
+
+    function testOwner() public {
+        assertEq(configurator.owner(), admin);
     }
 
     function testSetGuardian() public {

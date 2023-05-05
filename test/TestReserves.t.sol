@@ -25,6 +25,8 @@ contract ReservesTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -33,10 +35,13 @@ contract ReservesTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market), address(market), Denominations.USD, market1Price);
 
+        vm.prank(admin);
         ib.setReserveManager(reserveManager);
 
         vm.startPrank(admin);
@@ -55,26 +60,23 @@ contract ReservesTest is Test, Common {
         market.transfer(address(ib), donateAmount);
         vm.stopPrank();
 
-        (,, uint256 totalCash,, uint256 totalSupply, uint256 totalReserves,) = ib.markets(address(market));
-        uint256 exchangeRate = ib.getExchangeRate(address(market));
-
         assertEq(market.balanceOf(address(ib)), 300e18);
-        assertEq(totalCash, 100e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 0);
-        assertEq(exchangeRate, 1e18);
+        assertEq(ib.getTotalCash(address(market)), 100e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 0);
+        assertEq(ib.getExchangeRate(address(market)), 1e18);
 
         vm.prank(reserveManager);
+        vm.expectEmit(true, false, false, true, address(ib));
+        emit ReservesIncreased(address(market), donateAmount, donateAmount);
+
         ib.absorbToReserves(address(market));
 
-        (,, totalCash,, totalSupply, totalReserves,) = ib.markets(address(market));
-        exchangeRate = ib.getExchangeRate(address(market));
-
         assertEq(market.balanceOf(address(ib)), 300e18);
-        assertEq(totalCash, 300e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 200e18);
-        assertEq(exchangeRate, 1e18); // exchange rate is not affected
+        assertEq(ib.getTotalCash(address(market)), 300e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 200e18);
+        assertEq(ib.getExchangeRate(address(market)), 1e18); // exchange rate is not affected
     }
 
     function testAbsorbToReservesWithNoSurplusAmount() public {
@@ -85,27 +87,21 @@ contract ReservesTest is Test, Common {
         ib.supply(user1, user1, address(market), supplyAmount);
         vm.stopPrank();
 
-        (,, uint256 totalCash,, uint256 totalSupply, uint256 totalReserves,) = ib.markets(address(market));
-        uint256 exchangeRate = ib.getExchangeRate(address(market));
-
         assertEq(market.balanceOf(address(ib)), 100e18);
-        assertEq(totalCash, 100e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 0);
-        assertEq(exchangeRate, 1e18);
+        assertEq(ib.getTotalCash(address(market)), 100e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 0);
+        assertEq(ib.getExchangeRate(address(market)), 1e18);
 
         vm.prank(reserveManager);
         ib.absorbToReserves(address(market));
 
-        (,, totalCash,, totalSupply, totalReserves,) = ib.markets(address(market));
-        exchangeRate = ib.getExchangeRate(address(market));
-
         // Nothing changed.
         assertEq(market.balanceOf(address(ib)), 100e18);
-        assertEq(totalCash, 100e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 0);
-        assertEq(exchangeRate, 1e18);
+        assertEq(ib.getTotalCash(address(market)), 100e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 0);
+        assertEq(ib.getExchangeRate(address(market)), 1e18);
     }
 
     function testCannotAbsorbToReservesForNotReserveManager() public {
@@ -134,23 +130,27 @@ contract ReservesTest is Test, Common {
         vm.stopPrank();
 
         vm.startPrank(reserveManager);
+        vm.expectEmit(true, false, false, true, address(ib));
+        emit ReservesIncreased(address(market), donateAmount, donateAmount);
+
         ib.absorbToReserves(address(market));
 
-        (,, uint256 totalCash,, uint256 totalSupply, uint256 totalReserves,) = ib.markets(address(market));
-
         assertEq(market.balanceOf(address(ib)), 300e18);
-        assertEq(totalCash, 300e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 200e18);
+        assertEq(ib.getTotalCash(address(market)), 300e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 200e18);
 
-        ib.reduceReserves(address(market), 100e18, reserveManager);
+        uint256 reduceAmount = 100e18;
 
-        (,, totalCash,, totalSupply, totalReserves,) = ib.markets(address(market));
+        vm.expectEmit(true, true, false, true, address(ib));
+        emit ReservesDecreased(address(market), reserveManager, reduceAmount, reduceAmount);
+
+        ib.reduceReserves(address(market), reduceAmount, reserveManager);
 
         assertEq(market.balanceOf(address(ib)), 200e18);
-        assertEq(totalCash, 200e18);
-        assertEq(totalSupply, 100e18);
-        assertEq(totalReserves, 100e18);
+        assertEq(ib.getTotalCash(address(market)), 200e18);
+        assertEq(ib.getTotalSupply(address(market)), 100e18);
+        assertEq(ib.getTotalReserves(address(market)), 100e18);
         assertEq(market.balanceOf(reserveManager), 100e18);
         vm.stopPrank();
     }

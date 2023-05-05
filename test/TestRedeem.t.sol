@@ -30,9 +30,13 @@ contract RedeemTest is Test, Common {
         ib = createIronBank(admin);
 
         configurator = createMarketConfigurator(admin, ib);
+
+        vm.prank(admin);
         ib.setMarketConfigurator(address(configurator));
 
         creditLimitManager = createCreditLimitManager(admin, ib);
+
+        vm.prank(admin);
         ib.setCreditLimitManager(address(creditLimitManager));
 
         TripleSlopeRateModel irm = createDefaultIRM();
@@ -42,6 +46,8 @@ contract RedeemTest is Test, Common {
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
+
+        vm.prank(admin);
         ib.setPriceOracle(address(oracle));
 
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
@@ -65,6 +71,9 @@ contract RedeemTest is Test, Common {
 
         fastForwardTime(86400);
 
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Redeem(address(market1), user1, user1, redeemAmount, redeemAmount);
+
         ib.redeem(user1, user1, address(market1), redeemAmount);
         vm.stopPrank();
 
@@ -84,6 +93,9 @@ contract RedeemTest is Test, Common {
         ib.supply(user1, user1, address(market1), supplyAmount);
 
         fastForwardTime(86400);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Redeem(address(market1), user1, user2, redeemAmount, redeemAmount);
 
         ib.redeem(user1, user2, address(market1), redeemAmount);
         vm.stopPrank();
@@ -109,6 +121,9 @@ contract RedeemTest is Test, Common {
         fastForwardTime(86400);
 
         vm.prank(user2);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Redeem(address(market1), user1, user1, redeemAmount, redeemAmount);
+
         ib.redeem(user1, user1, address(market1), redeemAmount);
 
         assertEq(market1.balanceOf(user1), 9950e18); // 10000 - 100 + 50
@@ -136,6 +151,9 @@ contract RedeemTest is Test, Common {
         fastForwardTime(86400);
 
         vm.prank(user1);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Redeem(address(market1), user1, user1, redeemAmount, 49.998483725983132345e18); // ibTokenAmount = 50 / 1.0000303264
+
         ib.redeem(user1, user1, address(market1), redeemAmount);
 
         /**
@@ -164,6 +182,9 @@ contract RedeemTest is Test, Common {
         fastForwardTime(86400);
 
         vm.prank(user1);
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Redeem(address(market1), user1, user1, 50.00303264e18, 50.001516274016867655e18);
+
         ib.redeem(user1, user1, address(market1), type(uint256).max);
 
         assertEq(ibToken1.balanceOf(user1), 0);
