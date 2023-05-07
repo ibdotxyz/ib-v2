@@ -160,14 +160,30 @@ contract IronBank is
         return allowedExtensions[user][extension];
     }
 
+    /**
+     * @notice Get the credit limit of a user in a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @return The credit limit
+     */
     function getCreditLimit(address user, address market) public view returns (uint256) {
         return creditLimits[user][market];
     }
 
+    /**
+     * @notice Get the list of all credit markets for a user.
+     * @param user The address of the user
+     * @return The list of all credit markets
+     */
     function getUserCreditMarkets(address user) public view returns (address[] memory) {
         return allCreditMarkets[user];
     }
 
+    /**
+     * @notice Weither or not an account is a credit account.
+     * @param user The address of the user
+     * @return true if the account is a credit account, false otherwise
+     */
     function isCreditAccount(address user) public view returns (bool) {
         return allCreditMarkets[user].length > 0;
     }
@@ -321,7 +337,6 @@ contract IronBank is
     {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
-        require(!isCreditAccount(from), "credit account cannot redeem");
 
         _accrueInterest(market, m);
 
@@ -506,6 +521,12 @@ contract IronBank is
         emit MarketConfigurationChanged(market, config);
     }
 
+    /**
+     * @notice Set the credit limit for a user in a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @param credit The credit limit
+     */
     function setCreditLimit(address user, address market, uint256 credit) external onlyCreditLimitManager {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
