@@ -181,7 +181,7 @@ contract IronBank is
     }
 
     /**
-     * @notice Weither or not an account is a credit account.
+     * @notice Whether or not an account is a credit account.
      * @param user The address of the user
      * @return true if the account is a credit account, false otherwise
      */
@@ -228,6 +228,10 @@ contract IronBank is
         _accrueInterest(market, m);
     }
 
+    /**
+     * @notice Check the account liquidity of a user.
+     * @param user The address of the user
+     */
     function checkAccountLiquidity(address user) public {
         _checkAccountLiquidity(user);
     }
@@ -431,6 +435,12 @@ contract IronBank is
         emit Liquidate(liquidator, borrower, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
 
+    /**
+     * @notice Defer the liquidity check to a user.
+     * @dev The message sender must implement the DeferLiquidityCheckInterface.
+     * @param user The address of the user
+     * @param data The data to pass to the callback
+     */
     function deferLiquidityCheck(address user, bytes memory data) external {
         require(!isCreditAccount(user), "credit account cannot defer liquidity check");
         require(liquidityCheckStatus[user] == LIQUIDITY_CHECK_NORMAL, "reentry defer liquidity check");
@@ -845,6 +855,10 @@ contract IronBank is
         return amount;
     }
 
+    /**
+     * @dev Check the account liquidity of a user. If the account liquidity check is deferred, mark the status to dirty. It must be checked later.
+     * @param user The address of the user
+     */
     function _checkAccountLiquidity(address user) internal {
         uint8 status = liquidityCheckStatus[user];
 
@@ -856,6 +870,11 @@ contract IronBank is
         }
     }
 
+    /**
+     * @dev Get the account liquidity of a user.
+     * @param user The address of the user
+     * @return The totalcollateral value and total debt value of the user
+     */
     function _getAccountLiquidity(address user) internal view returns (uint256, uint256) {
         uint256 collateralValue;
         uint256 debtValue;
