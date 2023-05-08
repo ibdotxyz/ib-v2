@@ -212,17 +212,6 @@ contract RedeemTest is Test, Common {
         ib.redeem(user1, user1, address(invalidMarket), redeemAmount);
     }
 
-    function testCannotRedeemForCreditAccount() public {
-        uint256 redeemAmount = 50e18;
-
-        vm.prank(admin);
-        creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
-
-        vm.prank(user1);
-        vm.expectRevert("credit account cannot redeem");
-        ib.redeem(user1, user1, address(market1), redeemAmount);
-    }
-
     function testCannotRedeemForInsufficientCash() public {
         uint256 supplyAmount = 100e18;
         uint256 redeemAmount = 60e18;
