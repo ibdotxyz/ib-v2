@@ -156,6 +156,31 @@ contract RepayTest is Test, Common {
         assertGt(ib.getTotalBorrow(address(market1)), 0);
     }
 
+    function testRepayForCreditAccount() public {
+        uint256 creditLimit = 100e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user1, address(market1), creditLimit);
+
+        vm.startPrank(admin);
+        market1.approve(address(ib), 500e18);
+        ib.supply(admin, admin, address(market1), 500e18);
+        vm.stopPrank();
+
+        uint256 borrowAmount = 100e18;
+
+        vm.startPrank(user1);
+        ib.borrow(user1, user1, address(market1), borrowAmount);
+
+        market1.approve(address(ib), borrowAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Repay(address(market1), user1, user1, borrowAmount, 0, 0);
+
+        ib.repay(user1, user1, address(market1), borrowAmount);
+        vm.stopPrank();
+    }
+
     function testCannotRepayForInsufficientAllowance() public {
         uint256 borrowAmount = 300e18;
         uint256 repayAmount = 100e18;

@@ -161,4 +161,11 @@ contract AccrueInterestTest is Test, Common {
         vm.expectRevert("not listed");
         ib.accrueInterest(address(invalidMarket));
     }
+
+    function testCannotAccrueInterestsForTimestampTooLarge() public {
+        fastForwardTime(86400 * 365 * 100000); // 100,000 years later...
+
+        vm.expectRevert("timestamp too large");
+        ib.accrueInterest(address(market1));
+    }
 }

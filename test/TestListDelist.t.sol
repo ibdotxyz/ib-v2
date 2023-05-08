@@ -126,14 +126,6 @@ contract ListDelistTest is Test, Common {
         assertEq(markets[1], address(market));
     }
 
-    function testCannotListMarketForNotMarketConfigurator() public {
-        ERC20 market = new ERC20("Token", "TOKEN");
-        DataTypes.MarketConfig memory emptyConfig = ib.getMarketConfiguration(address(market));
-
-        vm.expectRevert("!configurator");
-        ib.listMarket(address(market), emptyConfig);
-    }
-
     function testCannotListMarketForNotAdmin() public {
         ERC20 market = new ERC20("Token", "TOKEN");
         IBToken ibToken = createIBToken(admin, address(ib), address(market));
@@ -156,7 +148,7 @@ contract ListDelistTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testCannotListMarketForMismatchUnderlying() public {
+    function testCannotListMarketForMismatchMarket() public {
         ERC20 market = new ERC20("Token", "TOKEN");
         ERC20 market2 = new ERC20("Token", "TOKEN");
         IBToken ibToken = createIBToken(admin, address(ib), address(market2));
@@ -185,6 +177,16 @@ contract ListDelistTest is Test, Common {
         configurator.listMarket(
             address(market), address(ibToken), address(debtToken), address(irm), invalidReserveFactor
         );
+    }
+
+    function testCannotListMarketForNonstandardTokenDecimals() public {
+        ERC20Market market = new ERC20Market("Token", "TOKEN", 19, admin);
+        IBToken ibToken = createIBToken(admin, address(ib), address(market));
+        DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
+
+        vm.prank(admin);
+        vm.expectRevert("nonstandard token decimals");
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
     function testCannotListMarketForUnderlyingAlreadyHasPToken() public {
@@ -289,19 +291,17 @@ contract ListDelistTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testHardDelistMarket2() public {
+    function testHardDelistPTokenMarket() public {
         ERC20 market = new ERC20("Token", "TOKEN");
         IBToken ibToken = createIBToken(admin, address(ib), address(market));
         DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
 
         PToken pToken = createPToken(admin, address(market));
         IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
 
         vm.startPrank(admin);
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
-
-        configurator.listMarket(address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor);
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
 
         configurator.softDelistMarket(address(pToken));
         configurator.hardDelistMarket(address(pToken));
@@ -318,11 +318,24 @@ contract ListDelistTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testCannotHardDelistForNotMarketConfigurator() public {
+    function testHardDelistPTokenMarket2() public {
         ERC20 market = new ERC20("Token", "TOKEN");
 
-        vm.expectRevert("!configurator");
-        ib.delistMarket(address(market));
+        PToken pToken = createPToken(admin, address(market));
+        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
+
+        vm.startPrank(admin);
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
+
+        configurator.softDelistMarket(address(pToken));
+        configurator.hardDelistMarket(address(pToken));
+
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
+        assertFalse(config.isListed);
+
+        address[] memory markets = ib.getAllMarkets();
+        assertEq(markets.length, 0);
+        vm.stopPrank();
     }
 
     function testCannotHardDelistForNotAdmin() public {

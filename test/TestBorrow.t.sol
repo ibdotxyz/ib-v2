@@ -348,6 +348,22 @@ contract BorrowTest is Test, Common {
         ib.borrow(user1, user1, address(market2), 1);
     }
 
+    function testCannotBorrowForCreditAccountBorrowToOthers() public {
+        uint256 borrowAmount = 500e18;
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), borrowAmount);
+        ib.supply(user2, user2, address(market2), borrowAmount);
+        vm.stopPrank();
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user1, address(market2), borrowAmount);
+
+        vm.prank(user1);
+        vm.expectRevert("credit account can only borrow to itself");
+        ib.borrow(user1, user2, address(market2), borrowAmount);
+    }
+
     function testCannotBorrowForInsufficientCreditLimit() public {
         uint256 borrowAmount = 500e18;
 

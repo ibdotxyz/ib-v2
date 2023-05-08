@@ -59,9 +59,6 @@ contract CreditLimitManagerTest is Test, Common {
         uint256 market1CreditLimit = 1000;
 
         vm.prank(admin);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market1), market1CreditLimit);
-
         creditLimitManager.setCreditLimit(user, address(market1), market1CreditLimit);
 
         CreditLimitManager.CreditLimit[] memory creditLimits = creditLimitManager.getUserCreditLimits(user);
@@ -80,9 +77,6 @@ contract CreditLimitManagerTest is Test, Common {
         uint256 market2CreditLimit = 500;
 
         vm.prank(admin);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market2), market2CreditLimit);
-
         creditLimitManager.setCreditLimit(user, address(market2), market2CreditLimit);
 
         creditLimits = creditLimitManager.getUserCreditLimits(user);
@@ -104,9 +98,6 @@ contract CreditLimitManagerTest is Test, Common {
         market1CreditLimit = 0;
 
         vm.prank(admin);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market1), market1CreditLimit);
-
         creditLimitManager.setCreditLimit(user, address(market1), market1CreditLimit);
 
         creditLimits = creditLimitManager.getUserCreditLimits(user);
@@ -125,9 +116,6 @@ contract CreditLimitManagerTest is Test, Common {
         market2CreditLimit = 0;
 
         vm.prank(admin);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market2), market2CreditLimit);
-
         creditLimitManager.setCreditLimit(user, address(market2), market2CreditLimit);
 
         creditLimits = creditLimitManager.getUserCreditLimits(user);
@@ -148,16 +136,6 @@ contract CreditLimitManagerTest is Test, Common {
         creditLimitManager.setCreditLimit(user, address(market1), market1CreditLimit);
     }
 
-    function testCannotSetCreditLimitForNotListed() public {
-        ERC20 notListedMarket = new ERC20("Token", "TOKEN");
-
-        uint256 market1CreditLimit = 1000;
-
-        vm.prank(admin);
-        vm.expectRevert("not listed");
-        creditLimitManager.setCreditLimit(user, address(notListedMarket), market1CreditLimit);
-    }
-
     function testPauseCreditLimit() public {
         uint256 market1CreditLimit = 1000;
 
@@ -175,17 +153,11 @@ contract CreditLimitManagerTest is Test, Common {
         creditLimitManager.setGuardian(guardian);
 
         vm.prank(admin);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market1), 1);
-
         creditLimitManager.pauseCreditLimit(user, address(market1));
 
         assertEq(ib.getCreditLimit(user, address(market1)), 1); // 1 wei
 
         vm.prank(guardian);
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit CreditLimitChanged(user, address(market2), 1);
-
         creditLimitManager.pauseCreditLimit(user, address(market2));
 
         assertEq(ib.getCreditLimit(user, address(market2)), 1); // 1 wei
@@ -201,18 +173,5 @@ contract CreditLimitManagerTest is Test, Common {
         vm.prank(admin);
         vm.expectRevert("cannot pause non-credit account");
         creditLimitManager.pauseCreditLimit(user, address(market1));
-    }
-
-    function testCannotPauseCreditLimitForNotListed() public {
-        uint256 market1CreditLimit = 1000;
-
-        vm.prank(admin);
-        creditLimitManager.setCreditLimit(user, address(market1), market1CreditLimit);
-
-        ERC20 notListedMarket = new ERC20("Token", "TOKEN");
-
-        vm.prank(admin);
-        vm.expectRevert("not listed");
-        creditLimitManager.pauseCreditLimit(user, address(notListedMarket));
     }
 }

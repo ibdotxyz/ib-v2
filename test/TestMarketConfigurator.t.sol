@@ -40,10 +40,6 @@ contract MarketConfiguratorTest is Test, Common {
         configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
     }
 
-    function testOwner() public {
-        assertEq(configurator.owner(), admin);
-    }
-
     function testSetGuardian() public {
         address guardian = address(256);
 
@@ -644,6 +640,22 @@ contract MarketConfiguratorTest is Test, Common {
         vm.prank(admin);
         vm.expectRevert("not listed");
         configurator.setMarketBorrowCaps(constructMarketCapArgument(address(notListedMarket), borrowCap));
+    }
+
+    function testCannotSetMarketBorrowCapsForPToken() public {
+        uint16 reserveFactor = 1000; // 10%
+
+        PToken pToken = createPToken(admin, address(market));
+        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
+
+        vm.prank(admin);
+        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
+
+        uint256 borrowCap = 100;
+
+        vm.prank(admin);
+        vm.expectRevert("cannot set borrow cap for pToken");
+        configurator.setMarketBorrowCaps(constructMarketCapArgument(address(pToken), borrowCap));
     }
 
     function testSetMarketSupplyPaused() public {

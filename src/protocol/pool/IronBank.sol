@@ -35,6 +35,7 @@ contract IronBank is
      */
     function initialize(address _admin) public initializer {
         __Ownable_init();
+        __UUPSUpgradeable_init();
 
         transferOwnership(_admin);
     }
@@ -422,6 +423,7 @@ contract IronBank is
 
         // Seize the collateral.
         uint256 ibTokenAmount = _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        require(ibTokenAmount > 0, "invalid seize amount");
         require(mCollateral.userSupplies[borrower] >= ibTokenAmount, "seize too much");
         _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount);
@@ -473,8 +475,8 @@ contract IronBank is
      */
     function transferIBToken(address market, address from, address to, uint256 amount) external nonReentrant {
         DataTypes.Market storage m = markets[market];
-        require(msg.sender == m.config.ibTokenAddress, "!authorized");
         require(m.config.isListed, "not listed");
+        require(msg.sender == m.config.ibTokenAddress, "!authorized");
         require(!m.config.isTransferPaused(), "transfer paused");
         require(from != to, "cannot self transfer");
         require(!isCreditAccount(to), "cannot transfer to credit account");
@@ -704,7 +706,6 @@ contract IronBank is
         //   = repayAmount * (liquidationBonus * borrowMarketPrice) / (collateralMarketPrice * exchangeRate)
         uint256 numerator = (mCollateral.config.liquidationBonus * borrowMarketPrice) / FACTOR_SCALE;
         uint256 denominator = (_getExchangeRate(mCollateral) * collateralMarketPrice) / 1e18;
-        require(numerator > 0 && denominator > 0);
 
         return (repayAmount * numerator) / denominator;
     }
@@ -870,6 +871,7 @@ contract IronBank is
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
+            require(assetPrice > 0, "invalid price");
             uint256 collateralFactor = m.config.collateralFactor;
             if (supplyBalance > 0 && collateralFactor > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
@@ -902,6 +904,7 @@ contract IronBank is
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
+            require(assetPrice > 0, "invalid price");
             uint256 liquidationThreshold = m.config.liquidationThreshold;
             if (supplyBalance > 0 && liquidationThreshold > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
