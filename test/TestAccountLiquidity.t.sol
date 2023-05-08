@@ -187,4 +187,22 @@ contract AccountLiquidityTest is Test, Common {
         assertEq(debtValue, 1500000e18);
         vm.stopPrank();
     }
+
+    function testCannotGetAccountLiquidityForInvalidPrice() public {
+        uint256 market1SupplyAmount = 1000 * (10 ** underlyingDecimals1);
+
+        vm.startPrank(user);
+        market1.approve(address(ib), market1SupplyAmount);
+        ib.supply(user, user, address(market1), market1SupplyAmount);
+        vm.stopPrank();
+
+        MockPriceOracle mockOracle = new MockPriceOracle();
+        mockOracle.setPrice(address(market1), 0);
+
+        vm.prank(admin);
+        ib.setPriceOracle(address(mockOracle));
+
+        vm.expectRevert("invalid price");
+        ib.getAccountLiquidity(user);
+    }
 }

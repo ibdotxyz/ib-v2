@@ -16,6 +16,7 @@ import "../src/protocol/token/IBToken.sol";
 import "../src/protocol/token/DebtToken.sol";
 import "../src/protocol/token/PToken.sol";
 import "./MockToken.t.sol";
+import "./MockPriceOracle.t.sol";
 import "./MockFeedRegistry.t.sol";
 
 abstract contract Common is Test, Events {

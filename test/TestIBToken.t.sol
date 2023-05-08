@@ -55,6 +55,27 @@ contract IBTokenTest is Test, Common {
         market.transfer(user1, 10000e18);
     }
 
+    function testChangeImplementation() public {
+        IBToken newImpl = new IBToken();
+
+        vm.prank(admin);
+        ibToken.upgradeTo(address(newImpl));
+    }
+
+    function testCannotInitializeAgain() public {
+        vm.prank(admin);
+        vm.expectRevert("Initializable: contract is already initialized");
+        ibToken.initialize("Name", "SYMBOL", user1, address(ib), address(market));
+    }
+
+    function testCannotChangeImplementationForNotOwner() public {
+        IBToken newImpl = new IBToken();
+
+        vm.prank(user1);
+        vm.expectRevert("Ownable: caller is not the owner");
+        ibToken.upgradeTo(address(newImpl));
+    }
+
     function testAsset() public {
         assertEq(address(market), ibToken.asset());
     }
@@ -96,6 +117,14 @@ contract IBTokenTest is Test, Common {
         ibToken.transferFrom(user1, user2, 0);
 
         assertEq(ibToken.balanceOf(user2), 0);
+    }
+
+    function testCannotTransferIBTokenForNotListed() public {
+        ERC20 notListedMarket = new ERC20("Token", "TOKEN");
+
+        vm.prank(user1);
+        vm.expectRevert("not listed");
+        ib.transferIBToken(address(notListedMarket), user1, user2, 100e18);
     }
 
     function testCannotTransferIBTokenForUnauthorized() public {
@@ -166,6 +195,19 @@ contract IBTokenTest is Test, Common {
         vm.prank(user1);
         vm.expectRevert("!authorized");
         ibToken.seize(user2, user1, 100e18);
+    }
+
+    function testCannotSeizeForSelfSeize() public {
+        address fakeIB = address(512);
+
+        IBToken impl = new IBToken();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        IBToken ibToken2 = IBToken(address(proxy));
+        ibToken2.initialize("Iron Bank Token", "ibToken", admin, fakeIB, address(market));
+
+        vm.prank(fakeIB);
+        vm.expectRevert("cannot self seize");
+        ibToken2.seize(user1, user1, 100e18);
     }
 
     function prepareTransfer() public {

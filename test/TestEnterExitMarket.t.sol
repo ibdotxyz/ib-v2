@@ -196,6 +196,9 @@ contract EnterExitMarketTest is Test, Common {
 
         ib.redeem(user1, user1, address(market1), type(uint256).max);
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
+
+        ib.redeem(user1, user1, address(market1), 0); // nothing happens
+        assertFalse(ib.isEnteredMarket(user1, address(market1)));
         vm.stopPrank();
     }
 
@@ -232,6 +235,9 @@ contract EnterExitMarketTest is Test, Common {
         emit MarketExited(address(market1), user1);
 
         ib.repay(user1, user1, address(market1), type(uint256).max);
+        assertFalse(ib.isEnteredMarket(user1, address(market1)));
+
+        ib.repay(user1, user1, address(market1), 0); // nothing happens
         assertFalse(ib.isEnteredMarket(user1, address(market1)));
         vm.stopPrank();
     }

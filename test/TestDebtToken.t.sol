@@ -55,9 +55,40 @@ contract DebtTokenTest is Test, Common {
         vm.stopPrank();
     }
 
+    function testChangeImplementation() public {
+        DebtToken newImpl = new DebtToken();
+
+        vm.prank(admin);
+        debtToken1.upgradeTo(address(newImpl));
+    }
+
+    function testCannotInitializeAgain() public {
+        vm.prank(admin);
+        vm.expectRevert("Initializable: contract is already initialized");
+        debtToken1.initialize("Name", "SYMBOL", user1, address(ib), address(market1));
+    }
+
+    function testCannotChangeImplementationForNotOwner() public {
+        DebtToken newImpl = new DebtToken();
+
+        vm.prank(user1);
+        vm.expectRevert("Ownable: caller is not the owner");
+        debtToken1.upgradeTo(address(newImpl));
+    }
+
     function testAsset() public {
         assertEq(address(market1), debtToken1.asset());
         assertEq(address(market2), debtToken2.asset());
+    }
+
+    function testName() public {
+        assertEq(debtToken1.name(), "Iron Bank Debt Token");
+        assertEq(debtToken2.name(), "Iron Bank Debt Token");
+    }
+
+    function testSymbol() public {
+        assertEq(debtToken1.symbol(), "debtToken");
+        assertEq(debtToken2.symbol(), "debtToken");
     }
 
     function testDecimals() public {
@@ -157,6 +188,9 @@ contract DebtTokenTest is Test, Common {
     }
 
     function testCannotCallUnsupportedFunctions() public {
+        vm.expectRevert("unsupported");
+        debtToken1.allowance(user1, user2);
+
         vm.expectRevert("unsupported");
         debtToken1.approve(user2, 1);
 

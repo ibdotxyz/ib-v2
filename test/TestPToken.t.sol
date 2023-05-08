@@ -104,4 +104,10 @@ contract PTokenTest is Test, Common {
 
         assertEq(market2.balanceOf(address(pToken1)), 10_000 * (10 ** decimals2));
     }
+
+    function testCannotSeizeUnderlying() public {
+        vm.prank(admin);
+        vm.expectRevert("cannot seize underlying");
+        pToken1.seize(address(market1));
+    }
 }

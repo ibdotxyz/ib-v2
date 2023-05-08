@@ -362,6 +362,90 @@ contract LiquidateTest is Test, Common {
         assertFalse(ib.isUserLiquidatable(user1));
     }
 
+    function testLiquidationWithDelisting() public {
+        (ERC20Market market3,,) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
+
+        int256 market3Price = 800e8;
+        setPriceForMarket(oracle, registry, admin, address(market3), address(market3), Denominations.USD, market3Price);
+
+        uint16 market3CollateralFactor = 5000; // 50%
+        uint16 market3LiquidationThreshold = 5000; // 50%
+        uint16 market3LiquidationBonus = 11000; // 110%
+
+        vm.prank(admin);
+        configurator.configureMarketAsCollateral(
+            address(market3), market3CollateralFactor, market3LiquidationThreshold, market3LiquidationBonus
+        );
+
+        vm.prank(admin);
+        market3.transfer(user1, 100e18);
+
+        vm.startPrank(user1);
+        market3.approve(address(ib), 100e18);
+        ib.supply(user1, user1, address(market3), 100e18);
+        vm.stopPrank();
+
+        /**
+         * collateral value = 100 * 0.8 * 1500 + 100 * 0.5 * 800 = 160,000
+         * liquidation collateral value = 100 * 0.9 * 1500 + 100 * 0.5 * 800 = 175,000
+         * borrowed value = 500 * 200 = 100,000
+         */
+        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 160_000e18);
+        assertEq(debtValue, 100_000e18);
+        assertFalse(ib.isUserLiquidatable(user1));
+
+        vm.startPrank(admin);
+        configurator.softDelistMarket(address(market1));
+        configurator.adjustMarketCollateralFactor(address(market1), 0);
+        configurator.adjustMarketLiquidationThreshold(address(market1), 0);
+        configurator.hardDelistMarket(address(market1));
+        vm.stopPrank();
+
+        /**
+         * collateral value = 100 * 0.5 * 800 = 40,000
+         * liquidation collateral value = 100 * 0.5 * 800 = 40,000
+         * borrowed value = 500 * 200 = 100,000
+         */
+        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 40_000e18);
+        assertEq(debtValue, 100_000e18);
+        assertTrue(ib.isUserLiquidatable(user1));
+
+        // User2 liquidates user1.
+        uint256 repayAmount = 200e18;
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), repayAmount);
+
+        vm.expectEmit(true, true, true, true, address(ib));
+        emit Liquidate(user2, user1, address(market2), address(market3), repayAmount, 55e18);
+
+        ib.liquidate(user2, user1, address(market2), address(market3), repayAmount);
+
+        ib.redeem(user2, user2, address(market3), type(uint256).max);
+        vm.stopPrank();
+
+        /**
+         * debt repaid = 200 * 200 = 40,000
+         * collateral received (with 110% bonus) = 40,000 / 800 * 1.1 = 55
+         */
+        uint256 user2Market3Balance = market3.balanceOf(user2);
+        assertEq(user2Market3Balance, 55e18);
+
+        /**
+         * collateral value = 45 * 0.5 * 800 = 18,000
+         * liquidation collateral value = 45 * 0.5 * 800 = 18,000
+         * borrowed value = 300 * 200 = 60,000
+         */
+        (collateralValue, debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 18_000e18);
+        assertEq(debtValue, 60_000e18);
+
+        // User1 is still liquidable.
+        assertTrue(ib.isUserLiquidatable(user1));
+    }
+
     function testCannotLiquidateForInsufficientAllowance() public {
         int256 newMarket1Price = 1100e8;
         setPriceToRegistry(registry, admin, address(market1), Denominations.USD, newMarket1Price);
@@ -491,6 +575,20 @@ contract LiquidateTest is Test, Common {
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
     }
 
+    function testCannotLiquidateForInvalidPrice() public {
+        MockPriceOracle mockOracle = new MockPriceOracle();
+        mockOracle.setPrice(address(market1), 0);
+
+        vm.prank(admin);
+        ib.setPriceOracle(address(mockOracle));
+
+        uint256 repayAmount = 100e18;
+
+        vm.prank(user2);
+        vm.expectRevert("invalid price");
+        ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
+    }
+
     function testCannotLiquidateForSeizeTooMuch() public {
         (ERC20Market market3,,) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
 
@@ -537,6 +635,32 @@ contract LiquidateTest is Test, Common {
         vm.stopPrank();
     }
 
+    function testCannotLiquidateForInvalidSeizeAmount() public {
+        // Price drops drastically.
+        int256 newMarket1Price = 1000e8;
+        setPriceToRegistry(registry, admin, address(market1), Denominations.USD, newMarket1Price);
+
+        /**
+         * collateral value = 100 * 0.8 * 1000 = 80,000
+         * liquidation collateral value = 100 * 0.9 * 1000 = 90,000
+         * borrowed value = 500 * 200 = 100,000
+         */
+        (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user1);
+        assertEq(collateralValue, 80_000e18);
+        assertEq(debtValue, 100_000e18);
+        assertTrue(ib.isUserLiquidatable(user1));
+
+        // User2 liquidates user1.
+        uint256 repayAmount = 0;
+
+        vm.startPrank(user2);
+        market2.approve(address(ib), repayAmount);
+
+        vm.expectRevert("invalid seize amount");
+        ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
+        vm.stopPrank();
+    }
+
     function testCalculateLiquidationOpportunity() public {
         uint256 repayAmount = 150e18;
 
@@ -554,6 +678,13 @@ contract LiquidateTest is Test, Common {
     }
 
     function testCannotCalculateLiquidationOpportunityForInvalidPrice() public {
+        MockPriceOracle mockOracle = new MockPriceOracle();
+        mockOracle.setPrice(address(market1), 100);
+        mockOracle.setPrice(address(market2), 200);
+
+        vm.prank(admin);
+        ib.setPriceOracle(address(mockOracle));
+
         ERC20 notListedMarket = new ERC20("Token", "TOKEN");
 
         uint256 repayAmount = 150e18;
@@ -563,14 +694,8 @@ contract LiquidateTest is Test, Common {
 
         vm.expectRevert("invalid price");
         ib.calculateLiquidationOpportunity(address(market2), address(notListedMarket), repayAmount);
-    }
 
-    function testCannotCalculateLiquidationOpportunityForZeroValue() public {
-        (ERC20Market market3,,) = createAndListERC20Market(18, admin, ib, configurator, irm, reserveFactor);
-
-        uint256 repayAmount = 150e18;
-
-        vm.expectRevert();
-        ib.calculateLiquidationOpportunity(address(market2), address(market3), repayAmount);
+        vm.expectRevert("invalid price");
+        ib.calculateLiquidationOpportunity(address(notListedMarket), address(notListedMarket), repayAmount);
     }
 }
