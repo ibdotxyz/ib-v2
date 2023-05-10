@@ -6,6 +6,7 @@ import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/extensions/IronBankExtension.sol";
 import "../src/interfaces/DeferLiquidityCheckInterface.sol";
+import "../src/protocol/lens/IronBankLens.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
 import "../src/protocol/pool/interest-rate-model/TripleSlopeRateModel.sol";
 import "../src/protocol/pool/CreditLimitManager.sol";
@@ -228,5 +229,9 @@ abstract contract Common is Test, Events {
         ext.acceptOwnership();
         vm.stopPrank();
         return ext;
+    }
+
+    function createLens() internal returns (IronBankLens) {
+        return new IronBankLens();
     }
 }
