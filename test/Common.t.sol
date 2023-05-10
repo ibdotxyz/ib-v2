@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/extensions/IronBankExtension.sol";
+import "../src/flashLoan/interfaces/IERC3156FlashBorrower.sol";
+import "../src/flashLoan/FlashLoan.sol";
 import "../src/interfaces/DeferLiquidityCheckInterface.sol";
 import "../src/protocol/lens/IronBankLens.sol";
 import "../src/protocol/oracle/PriceOracle.sol";
@@ -233,5 +235,9 @@ abstract contract Common is Test, Events {
 
     function createLens() internal returns (IronBankLens) {
         return new IronBankLens();
+    }
+
+    function createFlashLoan(IronBank _ironBank) internal returns (FlashLoan) {
+        return new FlashLoan(address(_ironBank));
     }
 }
