@@ -55,7 +55,6 @@ contract IronBankLens is Constants {
         uint256 exchangeRate;
         uint256 supplyBalance;
         uint256 borrowBalance;
-        bool isEnteredMarket;
     }
 
     /**
@@ -160,8 +159,7 @@ contract IronBankLens is Constants {
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
             supplyBalance: ironBank.getSupplyBalance(user, market),
-            borrowBalance: ironBank.getBorrowBalance(user, market),
-            isEnteredMarket: ironBank.isEnteredMarket(user, market)
+            borrowBalance: ironBank.getBorrowBalance(user, market)
         });
     }
 
@@ -183,8 +181,7 @@ contract IronBankLens is Constants {
             market: market,
             exchangeRate: ironBank.getExchangeRate(market),
             supplyBalance: ironBank.getSupplyBalance(user, market),
-            borrowBalance: ironBank.getBorrowBalance(user, market),
-            isEnteredMarket: ironBank.isEnteredMarket(user, market)
+            borrowBalance: ironBank.getBorrowBalance(user, market)
         });
     }
 
