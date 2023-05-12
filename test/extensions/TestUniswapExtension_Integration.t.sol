@@ -7,17 +7,19 @@ import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "forge-std/Test.sol";
 import "../Common.t.sol";
 
-contract IronBankExtensionIntegrationTest is Test, Common {
+interface StEthInterface {
+    function submit(address _referral) external payable;
+}
+
+contract UniswapExtensionIntegrationTest is Test, Common {
     using SafeERC20 for IERC20;
 
     address constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address constant USDT = 0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-
-    address constant wethHolder = 0x030bA81f1c18d280636F32af80b9AAd02Cf0854e; // Aave aWETH
-    address constant daiHolder = 0x028171bCA77440897B824Ca71D1c56caC55b68A3; // Aave aDAI
-    address constant usdtHolder = 0x47ac0Fb4F2D84898e4D9E7b4DaB3C24507a6D503; // Binance-Peg Tokens
+    address constant STETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
+    address constant WSTETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
 
     address constant feedRegistry = 0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf;
     address constant uniswapV3Factory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
@@ -26,12 +28,15 @@ contract IronBankExtensionIntegrationTest is Test, Common {
     uint16 internal constant reserveFactor = 1000; // 10%
     uint16 internal constant stableCollateralFactor = 9000; // 90%
     uint16 internal constant wethCollateralFactor = 7000; // 70%
+    uint16 internal constant wstethCollateralFactor = 7000; // 70%
 
     IronBank ib;
     MarketConfigurator configurator;
     CreditLimitManager creditLimitManager;
     PriceOracle oracle;
-    IronBankExtension extension;
+    UniswapExtension extension;
+
+    PToken pDAI;
 
     address admin = address(64);
     address user1 = address(128);
@@ -55,10 +60,20 @@ contract IronBankExtensionIntegrationTest is Test, Common {
 
         TripleSlopeRateModel irm = createDefaultIRM();
 
+        // List WETH, DAI, USDT and WSTETH.
         createAndListERC20Market(WETH, admin, ib, configurator, irm, reserveFactor);
         createAndListERC20Market(DAI, admin, ib, configurator, irm, reserveFactor);
         createAndListERC20Market(USDT, admin, ib, configurator, irm, reserveFactor);
+        createAndListERC20Market(WSTETH, admin, ib, configurator, irm, reserveFactor);
 
+        // List pDAI.
+        pDAI = createPToken(admin, DAI);
+        IBToken ibToken = createIBToken(admin, address(ib), address(pDAI));
+
+        vm.prank(admin);
+        configurator.listPTokenMarket(address(pDAI), address(ibToken), address(irm), reserveFactor);
+
+        // Setup price oracle.
         oracle = createPriceOracle(admin, feedRegistry);
 
         vm.prank(admin);
@@ -67,161 +82,101 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         setPriceForMarket(oracle, admin, WETH, Denominations.ETH, Denominations.USD);
         setPriceForMarket(oracle, admin, DAI, DAI, Denominations.USD);
         setPriceForMarket(oracle, admin, USDT, USDT, Denominations.USD);
+        setPriceForMarket(oracle, admin, address(pDAI), DAI, Denominations.USD);
 
+        // Set collateral factors.
         configureMarketAsCollateral(admin, configurator, WETH, wethCollateralFactor);
         configureMarketAsCollateral(admin, configurator, DAI, stableCollateralFactor);
         configureMarketAsCollateral(admin, configurator, USDT, stableCollateralFactor);
+        configureMarketAsCollateral(admin, configurator, WSTETH, wstethCollateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(pDAI), stableCollateralFactor);
 
-        // Inject liquidity into pool and user1.
-        vm.startPrank(wethHolder);
+        extension = createUniswapExtension(admin, ib, uniswapV3Factory, uniswapV2Factory, WETH, STETH, WSTETH);
+
+        // Give some ether to user1.
+        vm.deal(user1, 10000e18);
+
+        // User1 converts some ether to stETH.
+        vm.prank(user1);
+        StEthInterface(STETH).submit{value: 1000e18}(address(0));
+
+        // Give some tokens to admin.
+        deal(WETH, admin, 10000e18);
+        deal(WSTETH, admin, 10000e18);
+        deal(DAI, admin, 10000000e18);
+        deal(USDT, admin, 10000000e6);
+
+        // Admin supplies some liquidity to Iron Bank.
+        vm.startPrank(admin);
         IERC20(WETH).safeIncreaseAllowance(address(ib), 10000e18);
-        ib.supply(wethHolder, wethHolder, WETH, 10000e18);
-        IERC20(WETH).safeTransfer(user1, 10000e18);
-        vm.stopPrank();
-
-        vm.startPrank(daiHolder);
+        ib.supply(admin, admin, WETH, 10000e18);
+        IERC20(WSTETH).safeIncreaseAllowance(address(ib), 10000e18);
+        ib.supply(admin, admin, WSTETH, 10000e18);
         IERC20(DAI).safeIncreaseAllowance(address(ib), 10000000e18);
-        ib.supply(daiHolder, daiHolder, DAI, 10000000e18);
-        IERC20(DAI).safeTransfer(user1, 10000000e18);
-        vm.stopPrank();
-
-        vm.startPrank(usdtHolder);
+        ib.supply(admin, admin, DAI, 10000000e18);
         IERC20(USDT).safeIncreaseAllowance(address(ib), 10000000e6);
-        ib.supply(usdtHolder, usdtHolder, USDT, 10000000e6);
-        IERC20(USDT).safeTransfer(user1, 10000000e6);
+        ib.supply(admin, admin, USDT, 10000000e6);
         vm.stopPrank();
 
-        extension = createExtension(admin, ib, uniswapV3Factory, uniswapV2Factory, WETH);
-
+        // User1 authorizes the extension.
         vm.prank(user1);
         ib.setUserExtension(address(extension), true);
     }
 
     function testSupplyEther() public {
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
         uint256 supplyAmount = 10e18;
 
         vm.prank(user1);
-        vm.deal(user1, supplyAmount);
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
         extension.execute{value: supplyAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
         assertEq(poolWethAfter - poolWethBefore, supplyAmount);
+        assertEq(user1EthBefore - user1EthAfter, supplyAmount);
     }
 
-    function testBorrowEther() public {
-        prepareBorrow();
-
-        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
-        uint256 borrowAmount = 10e18;
-
-        vm.prank(user1);
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
-        extension.execute(actions);
-
-        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
-        assertEq(poolWethBefore - poolWethAfter, borrowAmount);
-    }
-
-    function testRedeemEther() public {
+    function testSupplyStEth() public {
+        uint256 poolWStEthBefore = IERC20(WSTETH).balanceOf(address(ib));
         uint256 supplyAmount = 10e18;
+        uint256 wstEthSupplyAmount = WstEthInterface(WSTETH).getWstETHByStETH(supplyAmount);
 
         vm.startPrank(user1);
-        IERC20(WETH).safeIncreaseAllowance(address(ib), supplyAmount);
-        ib.supply(user1, user1, WETH, supplyAmount);
+        IERC20(STETH).safeIncreaseAllowance(address(extension), type(uint256).max); // Approve extension.
+
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({name: "ACTION_SUPPLY_STETH", data: abi.encode(supplyAmount)});
+        extension.execute(actions);
         vm.stopPrank();
 
-        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
-
-        vm.prank(user1);
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({name: "ACTION_REDEEM_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
-        extension.execute(actions);
-
-        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
-        assertEq(poolWethBefore - poolWethAfter, supplyAmount);
+        uint256 poolWStEthAfter = IERC20(WSTETH).balanceOf(address(ib));
+        assertEq(poolWStEthAfter - poolWStEthBefore, wstEthSupplyAmount);
     }
 
-    function testRepayEther() public {
-        prepareBorrow();
-
-        uint256 borrowAmount = 10e18;
-
-        vm.prank(user1);
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](1);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
-        extension.execute(actions1);
-
-        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
-        uint256 repayAmount = 5e18;
-
-        vm.prank(user1);
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
-        extension.execute{value: repayAmount}(actions2);
-
-        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
-        assertEq(poolWethAfter - poolWethBefore, repayAmount);
-    }
-
-    function testRepayFullEther() public {
-        prepareBorrow();
-
-        uint256 borrowAmount = 10e18;
-
-        vm.prank(user1);
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](1);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
-        extension.execute(actions1);
-
-        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
-        uint256 repayAmount = 12e18;
-
-        vm.prank(user1);
-        vm.deal(user1, repayAmount);
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
-        extension.execute{value: repayAmount}(actions2);
-
-        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
-        assertEq(poolWethAfter - poolWethBefore, borrowAmount);
-    }
-
-    function testSupplyBorrowRedeemRepay() public {
-        /**
-         * Supply 10,000 DAI to borrow 5,000 USDT and repay and redeem full.
-         */
+    function testSupplyPToken() public {
         uint256 supplyAmount = 10000e18;
-        uint256 borrowAmount = 5000e6;
 
-        uint256 userUsdtBefore = IERC20(USDT).balanceOf(user1);
-        uint256 userDaiBefore = IERC20(DAI).balanceOf(user1);
+        // User1 needs to have DAI to supply to pDAI.
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
-        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, supplyAmount)});
-        actions1[1] = IronBankExtension.Action({name: "ACTION_BORROW", data: abi.encode(USDT, borrowAmount)});
-        extension.execute(actions1);
+        IERC20(DAI).safeIncreaseAllowance(address(extension), type(uint256).max); // Approve extension.
 
-        uint256 userUsdtAfter = IERC20(USDT).balanceOf(user1);
-        uint256 userDaiAfter = IERC20(DAI).balanceOf(user1);
+        uint256 poolPDaiBefore = IERC20(pDAI).balanceOf(address(ib));
+        uint256 user1DaiBefore = IERC20(DAI).balanceOf(user1);
 
-        assertEq(userUsdtAfter - userUsdtBefore, borrowAmount);
-        assertEq(userDaiBefore - userDaiAfter, supplyAmount);
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] =
+            UniswapExtension.Action({name: "ACTION_SUPPLY_PTOKEN", data: abi.encode(address(pDAI), supplyAmount)});
+        extension.execute(actions);
 
-        IERC20(USDT).safeIncreaseAllowance(address(ib), borrowAmount);
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](2);
-        actions2[0] = IronBankExtension.Action({name: "ACTION_REPAY", data: abi.encode(USDT, type(uint256).max)});
-        actions2[1] = IronBankExtension.Action({name: "ACTION_REDEEM", data: abi.encode(DAI, type(uint256).max)});
-        extension.execute(actions2);
-
-        assertEq(ib.getBorrowBalance(user1, USDT), 0);
-        assertEq(ib.getSupplyBalance(user1, DAI), 0);
-
+        uint256 poolPDaiAfter = IERC20(pDAI).balanceOf(address(ib));
+        uint256 user1DaiAfter = IERC20(DAI).balanceOf(user1);
+        assertEq(poolPDaiAfter - poolPDaiBefore, supplyAmount);
+        assertEq(user1DaiBefore - user1DaiAfter, supplyAmount);
         vm.stopPrank();
     }
 
@@ -230,12 +185,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Long 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
-        uint256 longAmount = 100e18;
+        uint256 supplyAmount = 100000e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 longAmount = 100e18;
         address[] memory path = new address[](3);
         path[0] = WETH;
         path[1] = USDC;
@@ -244,9 +200,9 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
                 WETH, longAmount, DAI, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
@@ -255,12 +211,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, WETH) == longAmount);
-        assertTrue(ib.getSupplyBalance(user1, DAI) == collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
         assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
             data: abi.encode(
                 WETH, type(uint256).max, DAI, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline
@@ -280,12 +236,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Short 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
-        uint256 shortAmount = 100e18;
+        uint256 supplyAmount = 100000e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 shortAmount = 100e18;
         address[] memory path = new address[](3);
         path[0] = WETH;
         path[1] = USDC;
@@ -294,21 +251,21 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 500; // 0.05%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
             data: abi.encode(WETH, shortAmount, DAI, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
-        assertTrue(ib.getSupplyBalance(user1, DAI) > collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, WETH) == shortAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
                 WETH,
@@ -335,12 +292,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Long 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
-        uint256 longAmount = 100000e18;
+        uint256 supplyAmount = 50000e6;
+        deal(USDT, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 longAmount = 100000e18;
         address[] memory path = new address[](3);
         path[0] = DAI;
         path[1] = USDC;
@@ -349,9 +307,9 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
                 DAI, longAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
@@ -360,12 +318,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == longAmount);
-        assertTrue(ib.getSupplyBalance(user1, USDT) == collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
         assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
             data: abi.encode(
                 DAI, type(uint256).max, USDT, 0, path, fees, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline
@@ -385,12 +343,13 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Short 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
-        uint256 shortAmount = 100000e18;
+        uint256 supplyAmount = 50000e6;
+        deal(USDT, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 shortAmount = 100000e18;
         address[] memory path = new address[](3);
         path[0] = DAI;
         path[1] = USDC;
@@ -399,21 +358,21 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
             data: abi.encode(DAI, shortAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
-        assertTrue(ib.getSupplyBalance(user1, USDT) > collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == shortAmount);
         assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
                 DAI,
@@ -458,8 +417,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_OUTPUT",
             data: abi.encode(
                 DAI, borrowAmount, USDT, type(uint256).max, path, fees, bytes32("SUB_ACTION_SWAP_DEBT"), deadline
@@ -477,6 +436,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Path: DAI -> USDC -> USDT
          */
         uint256 supplyAmount = 100e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
@@ -493,8 +453,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         fees[0] = 100; // 0.01%
         fees[1] = 100; // 0.01%
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V3_EXACT_INPUT",
             data: abi.encode(DAI, supplyAmount, USDT, 0, path, fees, bytes32("SUB_ACTION_SWAP_COLLATERAL"), deadline)
         });
@@ -509,20 +469,21 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Long 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
-        uint256 longAmount = 100e18;
+        uint256 supplyAmount = 100000e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 longAmount = 100e18;
         address[] memory path = new address[](3);
         path[0] = WETH;
         path[1] = USDC;
         path[2] = DAI;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
                 WETH, longAmount, DAI, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
@@ -531,12 +492,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, WETH) == longAmount);
-        assertTrue(ib.getSupplyBalance(user1, DAI) == collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) == supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, WETH) == 0);
         assertTrue(ib.getBorrowBalance(user1, DAI) > 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
             data: abi.encode(WETH, type(uint256).max, DAI, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline)
         });
@@ -554,32 +515,33 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Short 100 WETH with additional 100,000 DAI collateral.
          * Path: WETH -> USDC -> DAI
          */
-        uint256 shortAmount = 100e18;
+        uint256 supplyAmount = 100000e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 100000e18;
-        IERC20(DAI).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 shortAmount = 100e18;
         address[] memory path = new address[](3);
         path[0] = WETH;
         path[1] = USDC;
         path[2] = DAI;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(DAI, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
             data: abi.encode(WETH, shortAmount, DAI, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, WETH) == 0);
-        assertTrue(ib.getSupplyBalance(user1, DAI) > collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, DAI) > supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, WETH) == shortAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
                 WETH, type(uint256).max, DAI, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"), deadline
@@ -599,20 +561,21 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Long 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
-        uint256 longAmount = 100000e18;
+        uint256 supplyAmount = 50000e6;
+        deal(USDT, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 longAmount = 100000e18;
         address[] memory path = new address[](3);
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
                 DAI, longAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_OPEN_LONG_POSITION"), deadline
@@ -621,12 +584,12 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == longAmount);
-        assertTrue(ib.getSupplyBalance(user1, USDT) == collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) == supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == 0);
         assertTrue(ib.getBorrowBalance(user1, USDT) > 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
             data: abi.encode(DAI, type(uint256).max, USDT, 0, path, bytes32("SUB_ACTION_CLOSE_LONG_POSITION"), deadline)
         });
@@ -644,32 +607,33 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Short 100,000 DAI with additional 50,000 USDT collateral.
          * Path: DAI -> USDC -> USDT
          */
-        uint256 shortAmount = 100000e18;
+        uint256 supplyAmount = 50000e6;
+        deal(USDT, user1, supplyAmount);
 
         vm.startPrank(user1);
-        uint256 collateralAmount = 50000e6;
-        IERC20(USDT).safeIncreaseAllowance(address(ib), collateralAmount);
+        IERC20(USDT).safeIncreaseAllowance(address(ib), supplyAmount);
 
+        uint256 shortAmount = 100000e18;
         address[] memory path = new address[](3);
         path[0] = DAI;
         path[1] = USDC;
         path[2] = USDT;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions1 = new IronBankExtension.Action[](2);
-        actions1[0] = IronBankExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, collateralAmount)});
-        actions1[1] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions1 = new UniswapExtension.Action[](2);
+        actions1[0] = UniswapExtension.Action({name: "ACTION_SUPPLY", data: abi.encode(USDT, supplyAmount)});
+        actions1[1] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
             data: abi.encode(DAI, shortAmount, USDT, 0, path, bytes32("SUB_ACTION_OPEN_SHORT_POSITION"), deadline)
         });
         extension.execute(actions1);
 
         assertTrue(ib.getSupplyBalance(user1, DAI) == 0);
-        assertTrue(ib.getSupplyBalance(user1, USDT) > collateralAmount);
+        assertTrue(ib.getSupplyBalance(user1, USDT) > supplyAmount);
         assertTrue(ib.getBorrowBalance(user1, DAI) == shortAmount);
         assertTrue(ib.getBorrowBalance(user1, USDT) == 0);
 
-        IronBankExtension.Action[] memory actions2 = new IronBankExtension.Action[](1);
-        actions2[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions2 = new UniswapExtension.Action[](1);
+        actions2[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(
                 DAI, type(uint256).max, USDT, type(uint256).max, path, bytes32("SUB_ACTION_CLOSE_SHORT_POSITION"), deadline
@@ -704,8 +668,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDC;
         path[2] = USDT;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_OUTPUT",
             data: abi.encode(DAI, borrowAmount, USDT, type(uint256).max, path, bytes32("SUB_ACTION_SWAP_DEBT"), deadline)
         });
@@ -721,6 +685,7 @@ contract IronBankExtensionIntegrationTest is Test, Common {
          * Path: DAI -> USDC -> USDT
          */
         uint256 supplyAmount = 100e18;
+        deal(DAI, user1, supplyAmount);
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), supplyAmount);
@@ -734,8 +699,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
         path[1] = USDC;
         path[2] = USDT;
         uint256 deadline = block.timestamp + 1 hours;
-        IronBankExtension.Action[] memory actions = new IronBankExtension.Action[](1);
-        actions[0] = IronBankExtension.Action({
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({
             name: "ACTION_UNISWAP_V2_EXACT_INPUT",
             data: abi.encode(DAI, supplyAmount, USDT, 0, path, bytes32("SUB_ACTION_SWAP_COLLATERAL"), deadline)
         });
@@ -746,8 +711,8 @@ contract IronBankExtensionIntegrationTest is Test, Common {
     }
 
     function prepareBorrow() internal {
-        vm.prank(daiHolder);
-        IERC20(DAI).safeTransfer(user1, 1000000e18);
+        // Make user1 have some collateral to borrow.
+        deal(DAI, user1, 1000000e18);
 
         vm.startPrank(user1);
         IERC20(DAI).safeIncreaseAllowance(address(ib), 1000000e18);

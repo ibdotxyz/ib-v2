@@ -4,7 +4,8 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/extensions/IronBankExtension.sol";
+import "../src/extensions/TxBuilderExtension.sol";
+import "../src/extensions/UniswapExtension.sol";
 import "../src/flashLoan/interfaces/IERC3156FlashBorrower.sol";
 import "../src/flashLoan/FlashLoan.sol";
 import "../src/interfaces/DeferLiquidityCheckInterface.sol";
@@ -22,6 +23,7 @@ import "../src/protocol/token/PToken.sol";
 import "./MockToken.t.sol";
 import "./MockPriceOracle.t.sol";
 import "./MockFeedRegistry.t.sol";
+import "./MockWstEth.t.sol";
 
 abstract contract Common is Test, Events {
     function fastForwardBlocks(uint256 blocks) internal {
@@ -131,7 +133,18 @@ abstract contract Common is Test, Events {
     }
 
     function createPriceOracle(address _admin, address _registry) internal returns (PriceOracle) {
-        PriceOracle oracle = new PriceOracle(_registry);
+        PriceOracle oracle = new PriceOracle(_registry, address(0), address(0));
+        oracle.transferOwnership(_admin);
+        vm.prank(_admin);
+        oracle.acceptOwnership();
+        return oracle;
+    }
+
+    function createPriceOracle(address _admin, address _registry, address _steth, address _wsteth)
+        internal
+        returns (PriceOracle)
+    {
+        PriceOracle oracle = new PriceOracle(_registry, _steth, _wsteth);
         oracle.transferOwnership(_admin);
         vm.prank(_admin);
         oracle.acceptOwnership();
@@ -218,14 +231,32 @@ abstract contract Common is Test, Events {
         vm.stopPrank();
     }
 
-    function createExtension(
+    function createUniswapExtension(
         address _admin,
         IronBank _ironBank,
         address _uniV3Factory,
         address _uniV2Factory,
-        address _weth
-    ) internal returns (IronBankExtension) {
-        IronBankExtension ext = new IronBankExtension(address(_ironBank), _uniV3Factory, _uniV2Factory, _weth);
+        address _weth,
+        address _steth,
+        address _wsteth
+    ) internal returns (UniswapExtension) {
+        UniswapExtension ext =
+            new UniswapExtension(address(_ironBank), _uniV3Factory, _uniV2Factory, _weth, _steth, _wsteth);
+        ext.transferOwnership(_admin);
+        vm.startPrank(_admin);
+        ext.acceptOwnership();
+        vm.stopPrank();
+        return ext;
+    }
+
+    function createTxBuilderExtension(
+        address _admin,
+        IronBank _ironBank,
+        address _weth,
+        address _steth,
+        address _wsteth
+    ) internal returns (TxBuilderExtension) {
+        TxBuilderExtension ext = new TxBuilderExtension(address(_ironBank), _weth, _steth, _wsteth);
         ext.transferOwnership(_admin);
         vm.startPrank(_admin);
         ext.acceptOwnership();

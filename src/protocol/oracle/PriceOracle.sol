@@ -6,11 +6,18 @@ import "chainlink/contracts/src/v0.8/interfaces/FeedRegistryInterface.sol";
 import "chainlink/contracts/src/v0.8/Denominations.sol";
 import "openzeppelin-contracts/contracts/access/Ownable2Step.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "../../extensions/interfaces/WstEthInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
 
 contract PriceOracle is Ownable2Step, PriceOracleInterface {
     /// @notice The Chainlink feed registry
     FeedRegistryInterface public immutable registry;
+
+    /// @notice The address of Lido staked ETH
+    address public immutable steth;
+
+    /// @notice The address of Lido wrapped staked ETH
+    address public immutable wsteth;
 
     struct AggregatorInfo {
         address base;
@@ -20,8 +27,10 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
     /// @notice The mapping from asset to aggregator
     mapping(address => AggregatorInfo) public aggregators;
 
-    constructor(address registry_) {
+    constructor(address registry_, address steth_, address wsteth_) {
         registry = FeedRegistryInterface(registry_);
+        steth = steth_;
+        wsteth = wsteth_;
     }
 
     /**
@@ -31,6 +40,13 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
      * @return The price of the asset in USD
      */
     function getPrice(address asset) external view returns (uint256) {
+        if (asset == wsteth) {
+            uint256 stEthPrice = getPriceFromChainlink(steth, Denominations.USD);
+            uint256 stEthPerToken = WstEthInterface(wsteth).stEthPerToken();
+            uint256 wstEthPrice = (stEthPrice * stEthPerToken) / 1e18;
+            return getNormalizedPrice(wstEthPrice, asset);
+        }
+
         AggregatorInfo memory aggregatorInfo = aggregators[asset];
         uint256 price = getPriceFromChainlink(aggregatorInfo.base, aggregatorInfo.quote);
         if (aggregatorInfo.quote == Denominations.ETH) {
@@ -38,8 +54,7 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
             uint256 ethUsdPrice = getPriceFromChainlink(Denominations.ETH, Denominations.USD);
             price = (price * ethUsdPrice) / 1e18;
         }
-        uint8 decimals = IERC20Metadata(asset).decimals();
-        return price * 10 ** (18 - decimals);
+        return getNormalizedPrice(price, asset);
     }
 
     /**
@@ -54,6 +69,11 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
 
         // Extend the decimals to 1e18.
         return uint256(price) * 10 ** (18 - uint256(registry.decimals(base, quote)));
+    }
+
+    function getNormalizedPrice(uint256 price, address asset) internal view returns (uint256) {
+        uint8 decimals = IERC20Metadata(asset).decimals();
+        return price * 10 ** (18 - decimals);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */

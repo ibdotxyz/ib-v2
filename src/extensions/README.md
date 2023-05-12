@@ -1,6 +1,20 @@
 # Iron Bank Extension
 
-Iron Bank extension is an external contract that provides multiple useful operations for user to manager their positions. It integrates Uniswap v2 and Uniswap v3. It also allows users to combine multiple operations into one transaction. Any action needs to have two fields, name and data. For data, it needs to use `abi.encode` to serialize the data into bytes32. The provided operations include:
+IBv2 currently offers two official extensions: TxBuilderExtension and UniswapExtension.
+
+## #TxBuilderExtension
+
+TxBuilderExtension allows users to perform multiple operations in a single transaction. For example, if a user wishes to supply WETH and borrow USDT, USDC, and DAI, they can achieve this with a single click using TxBuilderExtension. With the defer liquidity check feature, users could further save a lot of gas consumption. Additionally, TxBuilderExtension supports native ETH as well as pToken and its underlying token conversions.
+
+### UniswapExtension
+
+UniswapExtension enables users to better manage their positions by utilizing Uniswap's flashswap feature. Currently, the UniswapExtension offers six actions: open long position, close long position, open short position, close short position, debt swap, and collateral swap.
+
+## Usage
+
+Any action in TxBuilderExtension or UniswapExtension needs to have two fields, name and data. For data, it needs to use `abi.encode` to serialize the data into bytes32. The provided operations include:
+
+## TxBuilderExtension
 
 ### Supply Native Token
 
@@ -30,7 +44,7 @@ Action name: `ACTION_REDEEM_NATIVE_TOKEN`
 Action data:
 | Type | Description |
 |------|-------------|
-| uint256 | the redeem amount |
+| uint256 | the redeem amount, -1 will redeem full |
 
 ### Repay Native Token
 
@@ -87,6 +101,127 @@ Action data:
 |------|-------------|
 | address | the repay asset |
 | uint256 | the repay amount, -1 will repay full |
+
+### Supply stETH
+
+Help user wrap stETH into wstETH and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_STETH`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the supply amount |
+
+### Borrow stETH
+
+Help user borrow wstETH from Iron Bank and unwrap it to stETH.
+
+Action name: `ACTION_BORROW_STETH`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the borrow amount |
+
+### Redeem stETH
+
+Help user redeem wstETH from Iron Bank and unwrap it to stETH.
+
+Action name: `ACTION_REDEEM_STETH`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the redeem amount, -1 will redeem full |
+
+### Repay stETH
+
+Help user wrap stETH into wstETH and repay it into Iron Bank.
+
+Action name: `ACTION_REPAY_STETH`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the repay amount, -1 will repay full |
+
+### Supply pToken
+
+Help user wrap the underlying market into pToken and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_PTOKEN`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the pToken address |
+| uint256 | the supply amount |
+
+### Redeem pToken
+
+Help user redeem pToken from Iron Bank and unwrap it to the underlying market.
+
+Action name: `ACTION_REDEEM_PTOKEN`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the pToken address |
+| uint256 | the redeem amount |
+
+### Defer liquidity check
+
+Help user defer the liquidity check.
+
+Action name: `ACTION_DEFER_LIQUIDITY_CHECK`
+
+Action data: None
+
+## UniswapExtension
+
+### Supply Native Token
+
+Help user wrap Ether into WETH and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_NATIVE_TOKEN`
+
+Action data: None, but `msg.value` should be the supply amount.
+
+### Supply
+
+Help user supply asset.
+
+Action name: `ACTION_SUPPLY`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the supply asset |
+| uint256 | the supply amount |
+
+### Supply stETH
+
+Help user wrap stETH into wstETH and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_STETH`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the supply amount |
+
+### Supply pToken
+
+Help user wrap the underlying market into pToken and supply it into Iron Bank.
+
+Action name: `ACTION_SUPPLY_PTOKEN`
+
+Action data:
+| Type | Description |
+|------|-------------|
+| address | the pToken address |
+| uint256 | the supply amount |
 
 ### Leverage Long Through Uniswap v3
 

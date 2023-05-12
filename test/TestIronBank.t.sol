@@ -39,7 +39,7 @@ contract IronBankTest is Test, Common {
     }
 
     function testSetPriceOracle() public {
-        PriceOracle oracle = new PriceOracle(address(0));
+        PriceOracle oracle = new PriceOracle(address(0), address(0), address(0));
 
         vm.prank(admin);
         vm.expectEmit(false, false, false, true, address(ib));
@@ -50,7 +50,7 @@ contract IronBankTest is Test, Common {
     }
 
     function testCannotSetPriceOracleForNotOwner() public {
-        PriceOracle oracle = new PriceOracle(address(0));
+        PriceOracle oracle = new PriceOracle(address(0), address(0), address(0));
 
         vm.prank(user1);
         vm.expectRevert("Ownable: caller is not the owner");
