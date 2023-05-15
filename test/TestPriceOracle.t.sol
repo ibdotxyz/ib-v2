@@ -10,6 +10,8 @@ contract PriceOracleTest is Test, Common {
     uint8 internal constant underlyingDecimals2 = 8; // 1e8
     uint16 internal constant reserveFactor = 1000; // 10%
 
+    uint256 internal constant stEthPerToken = 1.1e18;
+
     IronBank ib;
     MarketConfigurator configurator;
     CreditLimitManager creditLimitManager;
@@ -18,6 +20,8 @@ contract PriceOracleTest is Test, Common {
 
     ERC20Market market1;
     ERC20Market market2;
+    ERC20Market steth;
+    MockWstEth wsteth;
 
     address admin = address(64);
     address user = address(128);
@@ -40,8 +44,12 @@ contract PriceOracleTest is Test, Common {
         (market1,,) = createAndListERC20Market(underlyingDecimals1, admin, ib, configurator, irm, reserveFactor);
         (market2,,) = createAndListERC20Market(underlyingDecimals2, admin, ib, configurator, irm, reserveFactor);
 
+        steth = new ERC20Market("Lido staked ETH", "stETH", 18, admin);
+        wsteth = new MockWstEth("Lido wrapped staked ETH", "wstETH", stEthPerToken);
+        createAndListERC20Market(address(wsteth), admin, ib, configurator, irm, reserveFactor);
+
         registry = createRegistry();
-        oracle = createPriceOracle(admin, address(registry));
+        oracle = createPriceOracle(admin, address(registry), address(steth), address(wsteth));
     }
 
     function testGetPrice() public {
@@ -77,6 +85,17 @@ contract PriceOracleTest is Test, Common {
         // The price from oracle is normalized by asset's decimals.
         uint256 price = oracle.getPrice(address(market2));
         assertEq(price, 1500e28); // 1500e18 * 1e18 / 1e8
+    }
+
+    function testGetWstEthPrice() public {
+        // Registry's decimals is 8.
+        int256 market1Price = 1500e8;
+
+        setPriceToRegistry(registry, admin, address(steth), Denominations.USD, market1Price);
+
+        // The price from oracle is normalized by asset's decimals.
+        uint256 price = oracle.getPrice(address(wsteth));
+        assertEq(price, 1650e18); // 1500e18 * 1.1 * 1e18 / 1e18
     }
 
     function testCannotGetPriceForInvalidPrice() public {
