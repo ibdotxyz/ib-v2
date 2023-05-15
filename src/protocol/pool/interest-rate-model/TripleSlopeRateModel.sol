@@ -28,6 +28,12 @@ contract TripleSlopeRateModel is InterestRateModelInterface {
         borrowPerSecond3 = borrowPerSecond3_;
     }
 
+    /**
+     * @notice Calculate the utilization rate.
+     * @param cash The cash in the market
+     * @param borrow The borrow in the market
+     * @return The utilization rate
+     */
     function getUtilization(uint256 cash, uint256 borrow) public pure returns (uint256) {
         if (borrow == 0) {
             return 0;
@@ -35,6 +41,12 @@ contract TripleSlopeRateModel is InterestRateModelInterface {
         return (borrow * 1e18) / (cash + borrow);
     }
 
+    /**
+     * @notice Get the borrow rate per second.
+     * @param cash The cash in the market
+     * @param borrow The borrow in the market
+     * @return The borrow rate per second
+     */
     function getBorrowRate(uint256 cash, uint256 borrow) public view returns (uint256) {
         uint256 utilization = getUtilization(cash, borrow);
         if (utilization <= kink1) {
@@ -51,6 +63,12 @@ contract TripleSlopeRateModel is InterestRateModelInterface {
         }
     }
 
+    /**
+     * @notice Get the supply rate per second.
+     * @param cash The cash in the market
+     * @param borrow The borrow in the market
+     * @return The supply rate per second
+     */
     function getSupplyRate(uint256 cash, uint256 borrow) public view returns (uint256) {
         uint256 borrowRate = getBorrowRate(cash, borrow);
         uint256 utilization = getUtilization(cash, borrow);

@@ -31,7 +31,7 @@ contract IronBank is
     using PauseFlags for DataTypes.MarketConfig;
 
     /**
-     * @notice Initialize the contract
+     * @notice Initialize the contract.
      */
     function initialize(address _admin) public initializer {
         __Ownable_init();
@@ -40,21 +40,33 @@ contract IronBank is
         transferOwnership(_admin);
     }
 
+    /**
+     * @notice Check if the caller is the market configurator.
+     */
     modifier onlyMarketConfigurator() {
         _checkMarketConfigurator();
         _;
     }
 
+    /**
+     * @notice Check if the caller is the reserve manager.
+     */
     modifier onlyReserveManager() {
         _checkReserveManager();
         _;
     }
 
+    /**
+     * @notice Check if the caller is the credit limit manager.
+     */
     modifier onlyCreditLimitManager() {
         require(msg.sender == creditLimitManager, "!manager");
         _;
     }
 
+    /**
+     * @notice Check if the user has authorized the caller.
+     */
     modifier isAuthorized(address from) {
         _checkAuthorized(from, msg.sender);
         _;
@@ -130,33 +142,72 @@ contract IronBank is
         return m.totalReserves;
     }
 
+    /**
+     * @notice Get the borrow balance of a user in a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @return The borrow balance
+     */
     function getBorrowBalance(address user, address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
 
         return _getBorrowBalance(m, user);
     }
 
+    /**
+     * @notice Get the supply balance of a user in a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @return The supply balance
+     */
     function getSupplyBalance(address user, address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
         return (markets[market].userSupplies[user] * _getExchangeRate(m)) / 1e18;
     }
 
+    /**
+     * @notice Get the account liquidity of a user.
+     * @param user The address of the user
+     * @return The account collateral value and borrow value
+     */
     function getAccountLiquidity(address user) public view returns (uint256, uint256) {
         return _getAccountLiquidity(user);
     }
 
+    /**
+     * @notice Get the user's entered markets.
+     * @param user The address of the user
+     * @return The list of entered markets
+     */
     function getUserEnteredMarkets(address user) public view returns (address[] memory) {
         return allEnteredMarkets[user];
     }
 
+    /**
+     * @notice Whether or not a user has entered a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @return true if the user has entered the market, false otherwise
+     */
     function isEnteredMarket(address user, address market) public view returns (bool) {
         return enteredMarkets[user][market];
     }
 
+    /**
+     * @notice Get the user's allowed extensions.
+     * @param user The address of the user
+     * @return The list of allowed extensions
+     */
     function getUserAllowedExtensions(address user) public view returns (address[] memory) {
         return allAllowedExtensions[user];
     }
 
+    /**
+     * @notice Whether or not a user has allowed an extension.
+     * @param user The address of the user
+     * @param extension The address of the extension
+     * @return true if the user has allowed the extension, false otherwise
+     */
     function isAllowedExtension(address user, address extension) public view returns (bool) {
         return allowedExtensions[user][extension];
     }
@@ -189,6 +240,11 @@ contract IronBank is
         return allCreditMarkets[user].length > 0;
     }
 
+    /**
+     * @notice Get the configuration of a market.
+     * @param market The address of the market
+     * @return The market configuration
+     */
     function getMarketConfiguration(address market) public view returns (DataTypes.MarketConfig memory) {
         return markets[market].config;
     }
@@ -221,6 +277,10 @@ contract IronBank is
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
+    /**
+     * @notice Accrue the interest of a market.
+     * @param market The address of the market
+     */
     function accrueInterest(address market) external nonReentrant {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
@@ -499,6 +559,12 @@ contract IronBank is
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
+    /**
+     * @notice List a market.
+     * @dev This function is callable by the market configurator only.
+     * @param market The address of the market
+     * @param config The market configuration
+     */
     function listMarket(address market, DataTypes.MarketConfig calldata config) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
         require(!m.config.isListed, "already listed");
@@ -511,6 +577,11 @@ contract IronBank is
         emit MarketListed(market, m.lastUpdateTimestamp, m.config);
     }
 
+    /**
+     * @notice Delist a market.
+     * @dev This function is callable by the market configurator only.
+     * @param market The address of the market
+     */
     function delistMarket(address market) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
@@ -521,6 +592,12 @@ contract IronBank is
         emit MarketDelisted(market);
     }
 
+    /**
+     * @notice Set the market configuration.
+     * @dev This function is callable by the market configurator only.
+     * @param market The address of the market
+     * @param config The market configuration
+     */
     function setMarketConfiguration(address market, DataTypes.MarketConfig calldata config)
         external
         onlyMarketConfigurator
@@ -535,6 +612,7 @@ contract IronBank is
 
     /**
      * @notice Set the credit limit for a user in a market.
+     * @dev This function is callable by the credit limit manager only.
      * @param user The address of the user
      * @param market The address of the market
      * @param credit The credit limit
@@ -555,6 +633,7 @@ contract IronBank is
 
     /**
      * @notice Increase reserves by absorbing the surplus cash.
+     * @dev This function is callable by the reserve manager only.
      * @param market The address of the market
      */
     function absorbToReserves(address market) external onlyReserveManager {
@@ -578,6 +657,7 @@ contract IronBank is
 
     /**
      * @notice Reduce reserves by withdrawing the requested amount.
+     * @dev This function is callable by the reserve manager only.
      * @param market The address of the market
      * @param ibTokenAmount The amount of ibToken to withdraw
      * @param recipient The address which will receive the underlying asset
@@ -669,23 +749,43 @@ contract IronBank is
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
+    /**
+     * @dev Get the current timestamp.
+     * @return The current timestamp, casted to uint40
+     */
     function _getNow() internal view virtual returns (uint40) {
         require(block.timestamp < 2 ** 40, "timestamp too large");
         return uint40(block.timestamp);
     }
 
+    /**
+     * @dev Check if the operator is authorized.
+     * @param from The address of the user
+     * @param operator The address of the operator
+     */
     function _checkAuthorized(address from, address operator) internal view {
         require(from == operator || (!isCreditAccount(from) && isAllowedExtension(from, operator)), "!authorized");
     }
 
+    /**
+     * @dev Check if the message sender is the market configurator.
+     */
     function _checkMarketConfigurator() internal view {
         require(msg.sender == marketConfigurator, "!configurator");
     }
 
+    /**
+     * @dev Check if the message sender is the credit limit manager.
+     */
     function _checkReserveManager() internal view {
         require(msg.sender == reserveManager, "!reserveManager");
     }
 
+    /**
+     * @dev Get the exchange rate.
+     * @param m The storage of the market
+     * @return The exchange rate
+     */
     function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
         if (m.totalSupply + m.totalReserves == 0) {
             return m.config.initialExchangeRate;
@@ -720,6 +820,12 @@ contract IronBank is
         return (repayAmount * numerator) / denominator;
     }
 
+    /**
+     * @dev Get the borrow balance of a user.
+     * @param m The storage of the market
+     * @param user The address of the user
+     * @return The borrow balance
+     */
     function _getBorrowBalance(DataTypes.Market storage m, address user) internal view returns (uint256) {
         DataTypes.UserBorrow memory b = m.userBorrows[user];
 
@@ -754,6 +860,11 @@ contract IronBank is
         }
     }
 
+    /**
+     * @dev Accrue interest to the current timestamp.
+     * @param market The address of the market
+     * @param m The storage of the market
+     */
     function _accrueInterest(address market, DataTypes.Market storage m) internal {
         uint40 timestamp = _getNow();
         uint256 timeElapsed = uint256(timestamp - m.lastUpdateTimestamp);
@@ -792,6 +903,11 @@ contract IronBank is
         }
     }
 
+    /**
+     * @dev Enter a market.
+     * @param market The address of the market
+     * @param user The address of the user
+     */
     function _enterMarket(address market, address user) internal {
         if (enteredMarkets[user][market]) {
             // Skip if user has entered the market.
@@ -804,6 +920,11 @@ contract IronBank is
         emit MarketEntered(market, user);
     }
 
+    /**
+     * @dev Exit a market.
+     * @param market The address of the market
+     * @param user The address of the user
+     */
     function _exitMarket(address market, address user) internal {
         if (!enteredMarkets[user][market]) {
             // Skip if user has not entered the market.

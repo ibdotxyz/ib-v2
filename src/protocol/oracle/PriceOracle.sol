@@ -34,7 +34,7 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
     }
 
     /**
-     * @notice Get the price of an asset in USD
+     * @notice Get the price of an asset in USD.
      * @dev The price returned will be normalized by asset's decimals.
      * @param asset The asset to get the price of
      * @return The price of the asset in USD
@@ -58,7 +58,7 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
     }
 
     /**
-     * @notice Get price from Chainlink
+     * @notice Get price from Chainlink.
      * @param base The base asset
      * @param quote The quote asset
      * @return The price
@@ -71,6 +71,12 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
         return uint256(price) * 10 ** (18 - uint256(registry.decimals(base, quote)));
     }
 
+    /**
+     * @dev Get the normalized price.
+     * @param price The price
+     * @param asset The asset
+     * @return The normalized price
+     */
     function getNormalizedPrice(uint256 price, address asset) internal view returns (uint256) {
         uint8 decimals = IERC20Metadata(asset).decimals();
         return price * 10 ** (18 - decimals);
@@ -85,7 +91,7 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
     }
 
     /**
-     * @notice Set the aggregators
+     * @notice Set the aggregators.
      * @param aggrs The aggregators
      */
     function _setAggregators(Aggregator[] calldata aggrs) external onlyOwner {

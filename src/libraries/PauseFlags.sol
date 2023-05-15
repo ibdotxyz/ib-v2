@@ -5,6 +5,7 @@ pragma solidity ^0.8.0;
 import "./DataTypes.sol";
 
 library PauseFlags {
+    /// @dev Mask for specific actions in the pause flag bit array
     uint8 internal constant PAUSE_SUPPLY_MASK = 0xFE;
     uint8 internal constant PAUSE_BORROW_MASK = 0xFD;
     uint8 internal constant PAUSE_TRANSFER_MASK = 0xFB;
