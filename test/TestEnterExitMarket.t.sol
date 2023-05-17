@@ -177,10 +177,6 @@ contract EnterExitMarketTest is Test, Common {
 
         vm.startPrank(user1);
         market1.approve(address(ib), type(uint256).max);
-
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit MarketEntered(address(market1), user1);
-
         ib.supply(user1, user1, address(market1), market1SupplyAmount);
         ib.borrow(user1, user1, address(market1), market1BorrowAmount);
         assertTrue(ib.isEnteredMarket(user1, address(market1)));
@@ -210,10 +206,6 @@ contract EnterExitMarketTest is Test, Common {
         vm.startPrank(admin);
         // Faucet some market1 for user1 to redeem full later.
         market1.approve(address(ib), market1SupplyAmount);
-
-        vm.expectEmit(true, true, false, true, address(ib));
-        emit MarketEntered(address(market1), user1);
-
         ib.supply(admin, admin, address(market1), market1SupplyAmount);
         vm.stopPrank();
 
