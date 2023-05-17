@@ -56,9 +56,7 @@ contract RedeemTest is Test, Common {
         configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10000e18);
-        vm.stopPrank();
+        deal(address(market1), user1, 10000e18);
     }
 
     function testRedeem() public {

@@ -51,8 +51,7 @@ contract IBTokenTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market), collateralFactor);
 
-        vm.prank(admin);
-        market.transfer(user1, 10000e18);
+        deal(address(market), user1, 10000e18);
     }
 
     function testChangeImplementation() public {

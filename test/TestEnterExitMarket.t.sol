@@ -63,12 +63,10 @@ contract EnterExitMarketTest is Test, Common {
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10_000 * (10 ** underlyingDecimals));
-        market1.transfer(user2, 10_000 * (10 ** underlyingDecimals));
-        market2.transfer(user1, 10_000 * (10 ** underlyingDecimals));
-        market2.transfer(user2, 10_000 * (10 ** underlyingDecimals));
-        vm.stopPrank();
+        deal(address(market1), user1, 10_000 * (10 ** underlyingDecimals));
+        deal(address(market2), user1, 10_000 * (10 ** underlyingDecimals));
+        deal(address(market1), user2, 10_000 * (10 ** underlyingDecimals));
+        deal(address(market2), user2, 10_000 * (10 ** underlyingDecimals));
     }
 
     function testSupplyAndBorrow() public {

@@ -61,10 +61,8 @@ contract AccountLiquidityTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.ETH, market2Price);
         setPriceToRegistry(registry, admin, Denominations.ETH, Denominations.USD, ethUsdPrice);
 
-        vm.startPrank(admin);
-        market1.transfer(user, 10_000 * (10 ** underlyingDecimals1));
-        market2.transfer(user, 10_000 * (10 ** underlyingDecimals2));
-        vm.stopPrank();
+        deal(address(market1), user, 10_000 * (10 ** underlyingDecimals1));
+        deal(address(market2), user, 10_000 * (10 ** underlyingDecimals2));
     }
 
     function testGetAccountLiquidity() public {

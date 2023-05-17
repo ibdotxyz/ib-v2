@@ -149,10 +149,10 @@ contract AccountLiquidityTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10000e18);
+        deal(address(market1), user1, 10000e18);
 
         // Injest some liquidity for borrow.
+        vm.startPrank(admin);
         market1.approve(address(ib), 10000e18);
         ib.supply(admin, admin, address(market1), 10000e18);
         market2.approve(address(ib), 10000e18);

@@ -55,10 +55,8 @@ contract RepayTest is Test, Common {
         configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user2, 10000e18);
-        market2.transfer(user1, 10000e18);
-        vm.stopPrank();
+        deal(address(market2), user1, 10000e18);
+        deal(address(market1), user2, 10000e18);
     }
 
     function testRepay() public {

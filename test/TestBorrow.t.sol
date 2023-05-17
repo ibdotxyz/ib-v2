@@ -56,10 +56,8 @@ contract BorrowTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10000e18);
-        market2.transfer(user2, 10000e18);
-        vm.stopPrank();
+        deal(address(market1), user1, 10000e18);
+        deal(address(market2), user2, 10000e18);
     }
 
     function testBorrow() public {

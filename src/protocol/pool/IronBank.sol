@@ -281,7 +281,7 @@ contract IronBank is
      * @notice Accrue the interest of a market.
      * @param market The address of the market
      */
-    function accrueInterest(address market) external nonReentrant {
+    function accrueInterest(address market) external {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
 
@@ -521,7 +521,7 @@ contract IronBank is
      * @param extension The address of the extension
      * @param allowed Whether to allow or disallow the extension
      */
-    function setUserExtension(address extension, bool allowed) external nonReentrant {
+    function setUserExtension(address extension, bool allowed) external {
         if (allowed && !allowedExtensions[msg.sender][extension]) {
             allowedExtensions[msg.sender][extension] = true;
             allAllowedExtensions[msg.sender].push(extension);
@@ -543,7 +543,7 @@ contract IronBank is
      * @param to The address to transfer to
      * @param amount The amount to transfer
      */
-    function transferIBToken(address market, address from, address to, uint256 amount) external nonReentrant {
+    function transferIBToken(address market, address from, address to, uint256 amount) external {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
