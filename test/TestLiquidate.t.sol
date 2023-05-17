@@ -54,14 +54,15 @@ contract LiquidateTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market1), address(market1), Denominations.USD, market1Price);
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.USD, market2Price);
 
+        deal(address(market1), user1, 10000e18);
+        deal(address(market2), user2, 10000e18);
+
         vm.startPrank(admin);
         configurator.configureMarketAsCollateral(
             address(market1), market1CollateralFactor, market1LiquidationThreshold, market1LiquidationBonus
         );
 
-        market1.transfer(user1, 10_000e18);
-        market2.transfer(user2, 10_000e18);
-
+        // Injest some liquidity for borrow.
         market2.approve(address(ib), type(uint256).max);
         ib.supply(admin, admin, address(market2), 10_000e18);
         vm.stopPrank();

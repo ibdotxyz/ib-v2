@@ -238,8 +238,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         require(amount0Delta > 0 || amount1Delta > 0, "invalid amount");
         UniV3SwapData memory data = abi.decode(_data, (UniV3SwapData));
         (address tokenIn, address tokenOut, uint24 fee) = data.path.decodeFirstPool();
-        IUniswapV3Pool pool = getUniV3Pool(tokenIn, tokenOut, fee);
-        require(address(pool) == msg.sender, "invalid pool");
+        address pool = getUniV3Pool(tokenIn, tokenOut, fee);
+        require(pool == msg.sender, "invalid pool");
 
         (bool isExactInput, uint256 amountToPay, uint256 amountReceived) = amount0Delta > 0
             ? (tokenIn < tokenOut, uint256(amount0Delta), uint256(-amount1Delta))
@@ -280,7 +280,7 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
 
             // Although we already know the amount to pay, we can't pay it at the beginning, because we can't redeem or
             // borrow for users until we supply or repay for users in the last step of the swap.
-            IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
+            IERC20(tokenIn).safeTransfer(pool, amountToPay);
         } else {
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
@@ -299,7 +299,7 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
                 data.path = data.path.skipToken();
 
                 // Make this pool as the recipient of the next swap.
-                uniV3ExactOutputInternal(amountToPay, address(pool), data);
+                uniV3ExactOutputInternal(amountToPay, pool, data);
             } else {
                 require(tokenOut == data.swapInAsset, "mismatch swap in asset");
 
@@ -314,7 +314,7 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
                 }
 
                 // Transfer the asset to the pool.
-                IERC20(tokenOut).safeTransfer(address(pool), amountToPay);
+                IERC20(tokenOut).safeTransfer(pool, amountToPay);
             }
         }
     }
@@ -334,8 +334,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         require(amount0 > 0 || amount1 > 0, "invalid amount");
         UniV2SwapData memory data = abi.decode(_data, (UniV2SwapData));
         (address tokenIn, address tokenOut) = (data.path[data.index], data.path[data.index + 1]);
-        IUniswapV2Pair pool = getUniV2Pool(tokenIn, tokenOut);
-        require(address(pool) == msg.sender, "invalid pool");
+        address pool = getUniV2Pool(tokenIn, tokenOut);
+        require(pool == msg.sender, "invalid pool");
         require(sender == address(this), "invalid sender");
 
         /**
@@ -385,7 +385,7 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
             }
 
             // Transfer the token to the pool and conclude the swap.
-            IERC20(tokenIn).safeTransfer(address(pool), amountToPay);
+            IERC20(tokenIn).safeTransfer(pool, amountToPay);
         } else {
             if (tokenIn == data.swapOutAsset) {
                 IERC20(data.swapOutAsset).safeIncreaseAllowance(address(ironBank), amountReceived);
@@ -419,7 +419,7 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
             }
 
             // Transfer the token to the pool and conclude the swap.
-            IERC20(tokenOut).safeTransfer(address(pool), amountToPay);
+            IERC20(tokenOut).safeTransfer(pool, amountToPay);
         }
     }
 
@@ -713,14 +713,14 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @param data The swap data
      */
     function uniV3ExactOutputInternal(uint256 amountOut, address recipient, UniV3SwapData memory data)
-        private
+        internal
         returns (uint256 amountIn)
     {
         (address tokenOut, address tokenIn, uint24 fee) = data.path.decodeFirstPool();
 
         bool zeroForOne = tokenIn < tokenOut;
 
-        (int256 amount0Delta, int256 amount1Delta) = getUniV3Pool(tokenIn, tokenOut, fee).swap(
+        (int256 amount0Delta, int256 amount1Delta) = IUniswapV3Pool(getUniV3Pool(tokenIn, tokenOut, fee)).swap(
             recipient,
             zeroForOne,
             -amountOut.toInt256(),
@@ -742,14 +742,14 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @param data The swap data
      */
     function uniV3ExactInputInternal(uint256 amountIn, address recipient, UniV3SwapData memory data)
-        private
+        internal
         returns (uint256 amountOut)
     {
         (address tokenIn, address tokenOut, uint24 fee) = data.path.decodeFirstPool();
 
         bool zeroForOne = tokenIn < tokenOut;
 
-        (int256 amount0, int256 amount1) = getUniV3Pool(tokenIn, tokenOut, fee).swap(
+        (int256 amount0, int256 amount1) = IUniswapV3Pool(getUniV3Pool(tokenIn, tokenOut, fee)).swap(
             recipient,
             zeroForOne,
             amountIn.toInt256(),
@@ -764,28 +764,28 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @notice Exact output swap on Uniswap v2.
      * @param data The swap data
      */
-    function uniV2ExactOutputInternal(UniV2SwapData memory data) private {
+    function uniV2ExactOutputInternal(UniV2SwapData memory data) internal {
         (address tokenA, address tokenB) = (data.path[data.index], data.path[data.index + 1]);
 
         uint256 amountOut = data.amounts[data.index];
 
         (uint256 amount0, uint256 amount1) = tokenA < tokenB ? (amountOut, uint256(0)) : (uint256(0), amountOut);
 
-        getUniV2Pool(tokenA, tokenB).swap(amount0, amount1, address(this), abi.encode(data));
+        IUniswapV2Pair(getUniV2Pool(tokenA, tokenB)).swap(amount0, amount1, address(this), abi.encode(data));
     }
 
     /**
      * @notice Exact input swap on Uniswap v2.
      * @param data The swap data
      */
-    function uniV2ExactInputInternal(UniV2SwapData memory data) private {
+    function uniV2ExactInputInternal(UniV2SwapData memory data) internal {
         (address tokenA, address tokenB) = (data.path[data.index], data.path[data.index + 1]);
 
         uint256 amountOut = data.amounts[data.index + 1];
 
         (uint256 amount0, uint256 amount1) = tokenA < tokenB ? (uint256(0), amountOut) : (amountOut, uint256(0));
 
-        getUniV2Pool(tokenA, tokenB).swap(amount0, amount1, address(this), abi.encode(data));
+        IUniswapV2Pair(getUniV2Pool(tokenA, tokenB)).swap(amount0, amount1, address(this), abi.encode(data));
     }
 
     /**
@@ -794,9 +794,9 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @param tokenB The address of the second token
      * @param fee The fee of the pool
      */
-    function getUniV3Pool(address tokenA, address tokenB, uint24 fee) private view returns (IUniswapV3Pool pool) {
+    function getUniV3Pool(address tokenA, address tokenB, uint24 fee) internal view returns (address pool) {
         UniswapV3Utils.PoolKey memory poolKey = UniswapV3Utils.getPoolKey(tokenA, tokenB, fee);
-        pool = IUniswapV3Pool(UniswapV3Utils.computeAddress(uniV3Factory, poolKey));
+        pool = UniswapV3Utils.computeAddress(uniV3Factory, poolKey);
     }
 
     /**
@@ -804,8 +804,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @param tokenA The address of the first token
      * @param tokenB The address of the second token
      */
-    function getUniV2Pool(address tokenA, address tokenB) private view returns (IUniswapV2Pair pair) {
-        pair = IUniswapV2Pair(UniswapV2Utils.computeAddress(uniV2Factory, tokenA, tokenB));
+    function getUniV2Pool(address tokenA, address tokenB) internal view returns (address pair) {
+        pair = UniswapV2Utils.computeAddress(uniV2Factory, tokenA, tokenB);
     }
 
     receive() external payable {}

@@ -68,14 +68,12 @@ contract ExchangeRateTest is Test, Common {
         configureMarketAsCollateral(admin, configurator, address(market1), market1CollateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
+        deal(address(market1), user1, 10_000 * (10 ** underlyingDecimals1));
+        deal(address(market2), user1, 10_000 * (10 ** underlyingDecimals2));
+        deal(address(market3), user1, 10_000 * (10 ** underlyingDecimals3));
+
         vm.prank(admin);
         ib.setReserveManager(reserveManager);
-
-        vm.startPrank(admin);
-        market1.transfer(user1, 10_000 * (10 ** underlyingDecimals1));
-        market2.transfer(user1, 10_000 * (10 ** underlyingDecimals2));
-        market3.transfer(user1, 10_000 * (10 ** underlyingDecimals3));
-        vm.stopPrank();
     }
 
     function testExchangeRate1e6SupplyAndBorrow() public {

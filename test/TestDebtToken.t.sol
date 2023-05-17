@@ -49,10 +49,8 @@ contract DebtTokenTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
-        vm.startPrank(admin);
-        market2.transfer(user1, 10000e18);
-        market2.transfer(user2, 10000e18);
-        vm.stopPrank();
+        deal(address(market2), user1, 10000e18);
+        deal(address(market2), user2, 10000e18);
     }
 
     function testChangeImplementation() public {

@@ -44,9 +44,7 @@ contract ReservesTest is Test, Common {
         vm.prank(admin);
         ib.setReserveManager(reserveManager);
 
-        vm.startPrank(admin);
-        market.transfer(user1, 10000e18);
-        vm.stopPrank();
+        deal(address(market), user1, 10000e18);
     }
 
     function testAbsorbToReserves() public {

@@ -25,10 +25,8 @@ contract PTokenTest is Test, Common {
         pToken1 = createPToken(admin, address(market1));
         pToken2 = createPToken(admin, address(market2));
 
-        vm.startPrank(admin);
-        market1.transfer(user, 10_000 * (10 ** decimals1));
-        market2.transfer(user, 10_000 * (10 ** decimals2));
-        vm.stopPrank();
+        deal(address(market1), user, 10_000 * (10 ** decimals1));
+        deal(address(market2), user, 10_000 * (10 ** decimals2));
     }
 
     function testDecimals() public {

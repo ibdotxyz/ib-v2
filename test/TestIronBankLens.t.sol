@@ -62,10 +62,8 @@ contract BorrowTest is Test, Common {
 
         lens = createLens();
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10000e18);
-        market2.transfer(user2, 10000e18);
-        vm.stopPrank();
+        deal(address(market1), user1, 10000e18);
+        deal(address(market2), user2, 10000e18);
 
         uint256 market1SupplyAmount = 100e18;
         uint256 market2BorrowAmount = 300e18;

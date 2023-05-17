@@ -56,10 +56,8 @@ contract SupplyTest is Test, Common {
 
         configureMarketAsCollateral(admin, configurator, address(market2), market2CollateralFactor);
 
-        vm.startPrank(admin);
-        market1.transfer(user1, 10000e18);
-        market1.transfer(user2, 10000e18);
-        vm.stopPrank();
+        deal(address(market1), user1, 10000e18);
+        deal(address(market1), user2, 10000e18);
     }
 
     function testSupply() public {
