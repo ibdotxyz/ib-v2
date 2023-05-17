@@ -1,6 +1,8 @@
 name: test
 
-on: workflow_dispatch
+on:
+  pull_request:
+    branches: [main]
 
 env:
   FOUNDRY_PROFILE: ci
@@ -31,4 +33,6 @@ jobs:
       - name: Run Forge tests
         run: |
           forge test -vvv
+        env:
+          ALCHEMY_KEY: ${{ secrets.ALCHEMY_KEY }}
         id: test
