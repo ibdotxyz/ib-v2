@@ -1,3 +1,5 @@
+![GitHub CI](https://github.com/ibdotxyz/ib-v2/actions/workflows/test.yml/badge.svg)
+
 # Iron Bank v2
 
 ## Getting started
