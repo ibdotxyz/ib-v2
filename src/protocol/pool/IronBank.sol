@@ -184,16 +184,6 @@ contract IronBank is
     }
 
     /**
-     * @notice Whether or not a user has entered a market.
-     * @param user The address of the user
-     * @param market The address of the market
-     * @return true if the user has entered the market, false otherwise
-     */
-    function isEnteredMarket(address user, address market) public view returns (bool) {
-        return enteredMarkets[user][market];
-    }
-
-    /**
      * @notice Get the user's allowed extensions.
      * @param user The address of the user
      * @return The list of allowed extensions
@@ -994,7 +984,7 @@ contract IronBank is
     /**
      * @dev Get the account liquidity of a user.
      * @param user The address of the user
-     * @return The totalcollateral value and total debt value of the user
+     * @return The total collateral value and total debt value of the user
      */
     function _getAccountLiquidity(address user) internal view returns (uint256, uint256) {
         uint256 collateralValue;

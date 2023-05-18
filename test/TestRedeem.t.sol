@@ -78,7 +78,6 @@ contract RedeemTest is Test, Common {
         assertEq(market1.balanceOf(user1), 9950e18); // 10000 - 100 + 50
         assertEq(ibToken1.balanceOf(user1), 50e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50e18);
     }
 
@@ -102,7 +101,6 @@ contract RedeemTest is Test, Common {
         assertEq(market1.balanceOf(user2), redeemAmount);
         assertEq(ibToken1.balanceOf(user1), 50e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50e18);
     }
 
@@ -127,7 +125,6 @@ contract RedeemTest is Test, Common {
         assertEq(market1.balanceOf(user1), 9950e18); // 10000 - 100 + 50
         assertEq(ibToken1.balanceOf(user1), 50e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 50e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50e18);
     }
 
@@ -167,7 +164,6 @@ contract RedeemTest is Test, Common {
          */
         assertEq(ibToken1.balanceOf(user1), 50.001516274016867655e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 50.00303264e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 50.001516274016867655e18);
         assertEq(market1.balanceOf(user1), 9950e18);
 
@@ -187,7 +183,6 @@ contract RedeemTest is Test, Common {
 
         assertEq(ibToken1.balanceOf(user1), 0);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 0);
-        assertFalse(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.totalSupply(), 0);
         assertGt(market1.balanceOf(user1), 10000e18);
     }
