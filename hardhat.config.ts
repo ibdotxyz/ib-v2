@@ -24,32 +24,43 @@ const config: HardhatUserConfig = {
   },
   namedAccounts: {
     deployer: 0,
+    user1: 1,
+    user2: 2,
     admin: {
-      default: 0,
       mainnet: "0xA5fC0BbfcD05827ed582869b7254b6f141BA84Eb",
-    },
-    wrappedNative: {
-      avalanche: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7",
-      op: "0x4200000000000000000000000000000000000006",
-      kovOp: "0x4200000000000000000000000000000000000006",
+      default: 0,
     },
     registry: {
       default: "0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf",
     },
+    weth: {
+      default: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    },
+    stETH: {
+      default: "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+    },
+    wstETH: {
+      default: "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+    },
+    uniswapV3Factory: {
+      default: "0x1F98431c8aD98523631AE4a59f267346ea31F984",
+    },
+    uniswapV2Factory: {
+      default: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+    },
+    usdDenomination: "0x0000000000000000000000000000000000000348",
+    ethDenomination: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
+    btcDenomination: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
   },
   networks: {
     hardhat: {
-      forking: {
-        url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
-      },
+      // forking: {
+      //   url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
+      // },
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
       accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY ?? ""}`],
-    },
-    localhost: {
-      url: "http://127.0.0.1:8545",
-      accounts: ["0x0c111f34151faefcbc215a9b78cf2f6a3f39f649f19b34e42862628cb8f95b00"],
     },
   },
   etherscan: {

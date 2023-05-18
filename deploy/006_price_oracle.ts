@@ -6,23 +6,42 @@ const deployFn: DeployFunction = async (hre) => {
 
   const { deployer, admin } = await getNamedAccounts();
 
-  var registryAddress;
+  var registryAddress, stETHAddress, wstETHAddress;
+
   const network = hre.network as any;
   if (network.config.forking || network.name == "mainnet") {
-    const { registry } = await getNamedAccounts();
+    const { registry, stETH, wstETH } = await getNamedAccounts();
     registryAddress = registry;
+    stETHAddress = stETH;
+    wstETHAddress = wstETH;
   } else {
-    const registry = await deploy("FeedRegistry", {
+    const registry = await deploy("MockFeedRegistry", {
       from: deployer,
       args: [],
       log: true,
     });
     registryAddress = registry.address;
+
+    const stETH = await deploy("StETH", {
+      from: deployer,
+      contract: "MockERC20",
+      args: ["staked Ether 2.0", "stETH", 18, deployer],
+      log: true,
+    });
+    stETHAddress = stETH.address;
+
+    const wstETH = await deploy("WstETH", {
+      from: deployer,
+      contract: "MockWstEth",
+      args: ["Wrapped liquid staked Ether 2.0", "wstETH", stETHAddress, "1124504367992424664"],
+      log: true,
+    });
+    wstETHAddress = wstETH.address;
   }
 
   const priceOracle = await deploy("PriceOracle", {
     from: deployer,
-    args: [registryAddress],
+    args: [registryAddress, stETHAddress, wstETHAddress],
     log: true,
   });
 
