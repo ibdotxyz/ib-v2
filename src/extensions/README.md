@@ -2,7 +2,7 @@
 
 IBv2 currently offers two official extensions: TxBuilderExtension and UniswapExtension.
 
-## #TxBuilderExtension
+### TxBuilderExtension
 
 TxBuilderExtension allows users to perform multiple operations in a single transaction. For example, if a user wishes to supply WETH and borrow USDT, USDC, and DAI, they can achieve this with a single click using TxBuilderExtension. With the defer liquidity check feature, users could further save a lot of gas consumption. Additionally, TxBuilderExtension supports native ETH as well as pToken and its underlying token conversions.
 
