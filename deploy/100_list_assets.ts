@@ -25,8 +25,8 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const wethAddress = (await get("WETH")).address;
   const usdc = await deploy("USDC", {
     from: deployer,
-    contract: "ERC20Mock",
-    args: ["USD Coin", "USDC", 6],
+    contract: "MockERC20",
+    args: ["USD Coin", "USDC", 6, deployer],
     log: true,
   });
 
@@ -93,20 +93,7 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       parseUnits(rf, 3)
     );
 
-    await execute(
-      "MockFeedRegistry",
-      { from: deployer, log: true },
-      "setAnswer",
-      underlying,
-      usdDenomination,
-      parseUnits(price, 8)
-    );
-    await execute("PriceOracle", { from: deployer, log: true }, "_setAggregators", [
-      [underlying, underlying, usdDenomination],
-    ]);
-
-    const assetPrice = await read("PriceOracle", "getPrice", underlying);
-    console.log(`Price of ${symbol} is ${formatUnits(assetPrice, 18)}`);
+    await execute("PriceOracle", { from: deployer, log: true }, "setPrice", underlying, parseUnits(price, 18));
   }
 };
 

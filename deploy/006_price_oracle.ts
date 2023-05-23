@@ -8,20 +8,22 @@ const deployFn: DeployFunction = async (hre) => {
 
   var registryAddress, stETHAddress, wstETHAddress;
 
+  var priceOracle;
+
   const network = hre.network as any;
   if (network.config.forking || network.name == "mainnet") {
     const { registry, stETH, wstETH } = await getNamedAccounts();
     registryAddress = registry;
     stETHAddress = stETH;
     wstETHAddress = wstETH;
-  } else {
-    const registry = await deploy("MockFeedRegistry", {
+
+    priceOracle = await deploy("PriceOracle", {
       from: deployer,
-      args: [],
+      args: [registryAddress, stETHAddress, wstETHAddress],
       log: true,
     });
-    registryAddress = registry.address;
-
+    await execute("PriceOracle", { from: deployer, log: true }, "transferOwnership", admin);
+  } else {
     const stETH = await deploy("StETH", {
       from: deployer,
       contract: "MockERC20",
@@ -37,16 +39,16 @@ const deployFn: DeployFunction = async (hre) => {
       log: true,
     });
     wstETHAddress = wstETH.address;
+
+    priceOracle = await deploy("PriceOracle", {
+      from: deployer,
+      contract: "MockPriceOracle",
+      args: [],
+      log: true,
+    });
   }
 
-  const priceOracle = await deploy("PriceOracle", {
-    from: deployer,
-    args: [registryAddress, stETHAddress, wstETHAddress],
-    log: true,
-  });
-
   await execute("IronBank", { from: deployer, log: true }, "setPriceOracle", priceOracle.address);
-  await execute("PriceOracle", { from: deployer, log: true }, "transferOwnership", admin);
 };
 
 deployFn.tags = ["PriceOracle", "deploy"];
