@@ -315,6 +315,7 @@ contract BorrowTest is Test, Common {
 
         assertEq(status.market, address(market2));
         assertEq(status.exchangeRate, 1e18);
+        assertEq(status.ibTokenBalance, 0);
         assertEq(status.supplyBalance, 0);
         assertEq(status.borrowBalance, 300e18);
     }
@@ -333,6 +334,7 @@ contract BorrowTest is Test, Common {
 
         assertEq(status.market, address(market2));
         assertEq(status.exchangeRate, 1.0000746496e18);
+        assertEq(status.ibTokenBalance, 0);
         assertEq(status.supplyBalance, 0);
         assertEq(status.borrowBalance, 300.041472e18);
     }
@@ -343,10 +345,12 @@ contract BorrowTest is Test, Common {
         assertEq(status.length, 2);
         assertEq(status[0].market, address(market1));
         assertEq(status[0].exchangeRate, 1e18);
+        assertEq(status[0].ibTokenBalance, 100e18);
         assertEq(status[0].supplyBalance, 100e18);
         assertEq(status[0].borrowBalance, 0);
         assertEq(status[1].market, address(market2));
         assertEq(status[1].exchangeRate, 1e18);
+        assertEq(status[1].ibTokenBalance, 0);
         assertEq(status[1].supplyBalance, 0);
         assertEq(status[1].borrowBalance, 300e18);
     }
@@ -364,10 +368,12 @@ contract BorrowTest is Test, Common {
         assertEq(status.length, 2);
         assertEq(status[0].market, address(market1));
         assertEq(status[0].exchangeRate, 1e18);
+        assertEq(status[0].ibTokenBalance, 100e18);
         assertEq(status[0].supplyBalance, 100e18);
         assertEq(status[0].borrowBalance, 0);
         assertEq(status[1].market, address(market2));
         assertEq(status[1].exchangeRate, 1.0000746496e18);
+        assertEq(status[1].ibTokenBalance, 0);
         assertEq(status[1].supplyBalance, 0);
         assertEq(status[1].borrowBalance, 300.041472e18);
     }

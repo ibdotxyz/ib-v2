@@ -93,6 +93,16 @@ contract IronBank is
     }
 
     /**
+     * @notice Get the IBToken address of a market.
+     * @param market The address of the market
+     * @return The IBToken address
+     */
+    function getIBTokenAddress(address market) public view returns (address) {
+        DataTypes.Market storage m = markets[market];
+        return m.config.ibTokenAddress;
+    }
+
+    /**
      * @notice Get the exchange rate of a market.
      * @param market The address of the market
      * @return The exchange rate
