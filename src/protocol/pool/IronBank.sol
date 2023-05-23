@@ -271,7 +271,7 @@ contract IronBank is
     {
         DataTypes.Market storage mCollateral = markets[marketCollateral];
 
-        return _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -481,10 +481,10 @@ contract IronBank is
         repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
         // Seize the collateral.
-        uint256 ibTokenBalance = _getIBTokenBalance(mCollateral, borrower);
-        uint256 ibTokenAmount = _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        uint256 borrowerIBTokenBalance = _getIBTokenBalance(mCollateral, borrower);
+        uint256 ibTokenAmount = _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
         require(ibTokenAmount > 0, "invalid seize amount");
-        require(ibTokenBalance >= ibTokenAmount, "seize too much");
+        require(borrowerIBTokenBalance >= ibTokenAmount, "seize too much");
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount);
 
         // Update the enter market of both borrower and liquidator after the IBToken is seized.
@@ -799,7 +799,7 @@ contract IronBank is
      * @param repayAmount The amount of the borrowed asset being repaid
      * @return The amount of ibToken that can be seized
      */
-    function _getLiquidationAmount(
+    function _getLiquidationSeizeAmount(
         address marketBorrow,
         address marketCollateral,
         DataTypes.Market storage mCollateral,
