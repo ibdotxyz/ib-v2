@@ -7,9 +7,17 @@ import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.s
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/ERC20Upgradeable.sol";
 import "./IBTokenStorage.sol";
+import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 
-contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpgradeable, IBTokenStorage {
+contract IBToken is
+    Initializable,
+    ERC20Upgradeable,
+    UUPSUpgradeable,
+    OwnableUpgradeable,
+    IBTokenStorage,
+    IBTokenInterface
+{
     /**
      * @notice Initialize the contract
      */
@@ -51,8 +59,9 @@ contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpg
      * @param amount The amount of IBToken to transfer
      */
     function transfer(address to, uint256 amount) public override returns (bool) {
-        IronBankInterface(ironBank).transferIBToken(market, msg.sender, to, amount);
-        return super.transfer(to, amount);
+        bool success = super.transfer(to, amount);
+        IronBankInterface(ironBank).validateIBTokenTransfer(market, msg.sender, to, amount);
+        return success;
     }
 
     /**
@@ -62,8 +71,9 @@ contract IBToken is Initializable, ERC20Upgradeable, UUPSUpgradeable, OwnableUpg
      * @param amount The amount of IBToken to transfer
      */
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        IronBankInterface(ironBank).transferIBToken(market, from, to, amount);
-        return super.transferFrom(from, to, amount);
+        bool success = super.transferFrom(from, to, amount);
+        IronBankInterface(ironBank).validateIBTokenTransfer(market, from, to, amount);
+        return success;
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
