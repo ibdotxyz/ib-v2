@@ -263,8 +263,7 @@ contract RepayTest is Test, Common {
 
         market1.approve(address(ib), repayAmount);
 
-        // Repay too much will cause the subtraction underflow.
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("repay too much");
         ib.repay(user1, user1, address(market1), repayAmount);
         vm.stopPrank();
     }
