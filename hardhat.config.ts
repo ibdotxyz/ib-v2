@@ -48,9 +48,6 @@ const config: HardhatUserConfig = {
     uniswapV2Factory: {
       default: "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
     },
-    usdDenomination: "0x0000000000000000000000000000000000000348",
-    ethDenomination: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE",
-    btcDenomination: "0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB",
   },
   networks: {
     hardhat: {
@@ -61,6 +58,9 @@ const config: HardhatUserConfig = {
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
       accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY ?? ""}`],
+    },
+    localhost: {
+      url: "http://127.0.0.1:8545",
     },
   },
   etherscan: {

@@ -1,13 +1,14 @@
 import { formatUnits } from "ethers/lib/utils";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { parse } from "path";
 
 const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deployments, ethers, getNamedAccounts } = hre;
   const { deploy, execute, get, save, read } = deployments;
   const { parseUnits } = ethers.utils;
 
-  const { deployer, admin, usdDenomination } = await getNamedAccounts();
+  const { deployer, admin } = await getNamedAccounts();
 
   const network = hre.network as any;
   if (network.config.forking || network.name == "mainnet") {
@@ -31,11 +32,11 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   });
 
   const assetToList = [
-    ["WETH", wethAddress, majorIRMAddress, "1800", "0.2"],
-    ["USDC", usdc.address, stableIRMAddress, "1", "0.15"],
+    ["WETH", wethAddress, majorIRMAddress, "1800", "0.2", "0.82", "0.9", "1.05"],
+    ["USDC", usdc.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.1"],
   ];
 
-  for (const [symbol, underlying, irm, price, rf] of assetToList) {
+  for (const [symbol, underlying, irm, price, rf, cf, lt, lb] of assetToList) {
     const ibToken = await deploy(`ib${symbol}`, {
       from: deployer,
       contract: "ERC1967Proxy",
@@ -90,10 +91,19 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       ibToken.address,
       debtToken.address,
       irm,
-      parseUnits(rf, 3)
+      parseUnits(rf, 4)
     );
 
     await execute("PriceOracle", { from: deployer, log: true }, "setPrice", underlying, parseUnits(price, 18));
+    await execute(
+      "MarketConfigurator",
+      { from: deployer, log: true },
+      "configureMarketAsCollateral",
+      underlying,
+      parseUnits(cf, 4),
+      parseUnits(lt, 4),
+      parseUnits(lb, 4)
+    );
   }
 };
 
