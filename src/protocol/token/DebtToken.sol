@@ -5,7 +5,6 @@ pragma solidity ^0.8.0;
 import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
-import "openzeppelin-contracts-upgradeable/contracts/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "./DebtTokenStorage.sol";
 import "../../interfaces/DebtTokenInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
@@ -49,7 +48,7 @@ contract DebtToken is Initializable, UUPSUpgradeable, OwnableUpgradeable, DebtTo
 
     /// @inheritdoc IERC20Metadata
     function decimals() public view returns (uint8) {
-        return IERC20MetadataUpgradeable(market).decimals();
+        return IERC20Metadata(market).decimals();
     }
 
     /// @inheritdoc IERC20

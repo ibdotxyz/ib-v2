@@ -93,6 +93,16 @@ contract IronBank is
     }
 
     /**
+     * @notice Get the IBToken address of a market.
+     * @param market The address of the market
+     * @return The IBToken address
+     */
+    function getIBTokenAddress(address market) public view returns (address) {
+        DataTypes.Market storage m = markets[market];
+        return m.config.ibTokenAddress;
+    }
+
+    /**
      * @notice Get the exchange rate of a market.
      * @param market The address of the market
      * @return The exchange rate
@@ -150,7 +160,6 @@ contract IronBank is
      */
     function getBorrowBalance(address user, address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
-
         return _getBorrowBalance(m, user);
     }
 
@@ -162,7 +171,7 @@ contract IronBank is
      */
     function getSupplyBalance(address user, address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
-        return (markets[market].userSupplies[user] * _getExchangeRate(m)) / 1e18;
+        return (_getIBTokenBalance(m, user) * _getExchangeRate(m)) / 1e18;
     }
 
     /**
@@ -181,16 +190,6 @@ contract IronBank is
      */
     function getUserEnteredMarkets(address user) public view returns (address[] memory) {
         return allEnteredMarkets[user];
-    }
-
-    /**
-     * @notice Whether or not a user has entered a market.
-     * @param user The address of the user
-     * @param market The address of the market
-     * @return true if the user has entered the market, false otherwise
-     */
-    function isEnteredMarket(address user, address market) public view returns (bool) {
-        return enteredMarkets[user][market];
     }
 
     /**
@@ -272,7 +271,7 @@ contract IronBank is
     {
         DataTypes.Market storage mCollateral = markets[marketCollateral];
 
-        return _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -326,10 +325,7 @@ contract IronBank is
         m.totalCash += amount;
         m.totalSupply += ibTokenAmount;
 
-        // Update user supply balance.
-        m.userSupplies[to] += ibTokenAmount;
-
-        if (m.userSupplies[to] > 0) {
+        if (amount > 0) {
             _enterMarket(market, to);
         }
 
@@ -372,7 +368,7 @@ contract IronBank is
         m.userBorrows[from].borrowBalance = newUserBorrowBalance;
         m.userBorrows[from].borrowIndex = m.borrowIndex;
 
-        if (newUserBorrowBalance > 0) {
+        if (amount > 0) {
             _enterMarket(market, from);
         }
 
@@ -406,9 +402,11 @@ contract IronBank is
         _accrueInterest(market, m);
 
         uint256 ibTokenAmount;
+        bool isRedeemFull;
         if (amount == type(uint256).max) {
-            ibTokenAmount = m.userSupplies[from];
+            ibTokenAmount = _getIBTokenBalance(m, from);
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
+            isRedeemFull = true;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
         }
@@ -419,10 +417,7 @@ contract IronBank is
         m.totalCash -= amount;
         m.totalSupply -= ibTokenAmount;
 
-        // Update user supply balance.
-        m.userSupplies[from] -= ibTokenAmount;
-
-        if (m.userSupplies[from] == 0 && _getBorrowBalance(m, from) == 0) {
+        if (isRedeemFull && _getBorrowBalance(m, from) == 0) {
             _exitMarket(market, from);
         }
 
@@ -486,11 +481,14 @@ contract IronBank is
         repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
         // Seize the collateral.
-        uint256 ibTokenAmount = _getLiquidationAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        uint256 borrowerIBTokenBalance = _getIBTokenBalance(mCollateral, borrower);
+        uint256 ibTokenAmount = _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
         require(ibTokenAmount > 0, "invalid seize amount");
-        require(mCollateral.userSupplies[borrower] >= ibTokenAmount, "seize too much");
-        _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
+        require(borrowerIBTokenBalance >= ibTokenAmount, "seize too much");
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount);
+
+        // Update the enter market of both borrower and liquidator after the IBToken is seized.
+        _updateEnteredMarket(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
 
         emit Liquidate(liquidator, borrower, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
@@ -536,14 +534,14 @@ contract IronBank is
     }
 
     /**
-     * @notice Transfer IBToken from one account to another.
-     * @dev This function is callable by the IBToken contract only.
+     * @notice Validate a transfer of IBToken.
+     * @dev This function is callable by the IBToken contract only and should be called after the IBToken balance is updated.
      * @param market The address of the market
      * @param from The address to transfer from
      * @param to The address to transfer to
      * @param amount The amount to transfer
      */
-    function transferIBToken(address market, address from, address to, uint256 amount) external {
+    function validateIBTokenTransfer(address market, address from, address to, uint256 amount) external {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
@@ -552,7 +550,7 @@ contract IronBank is
         require(!isCreditAccount(to), "cannot transfer to credit account");
 
         _accrueInterest(market, m);
-        _transferIBToken(market, m, from, to, amount);
+        _updateEnteredMarket(market, m, from, to, amount);
 
         _checkAccountLiquidity(from);
     }
@@ -801,7 +799,7 @@ contract IronBank is
      * @param repayAmount The amount of the borrowed asset being repaid
      * @return The amount of ibToken that can be seized
      */
-    function _getLiquidationAmount(
+    function _getLiquidationSeizeAmount(
         address marketBorrow,
         address marketCollateral,
         DataTypes.Market storage mCollateral,
@@ -838,23 +836,29 @@ contract IronBank is
     }
 
     /**
-     * @dev Transfer IBToken from one account to another.
-     * @param market The address of the market
+     * @dev Get the IBToken balance of a user.
      * @param m The storage of the market
+     * @param user The address of the user
+     * @return The IBToken balance
+     */
+    function _getIBTokenBalance(DataTypes.Market storage m, address user) internal view returns (uint256) {
+        return IERC20(m.config.ibTokenAddress).balanceOf(user);
+    }
+
+    /**
+     * @dev Update the entered market of a user when a IBToken transfer happens.
+     * @param market The address of the market
      * @param from The address to transfer from
      * @param to The address to transfer to
      * @param amount The amount to transfer
      */
-    function _transferIBToken(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
+    function _updateEnteredMarket(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
         internal
     {
         if (amount > 0) {
             _enterMarket(market, to);
 
-            m.userSupplies[from] -= amount;
-            m.userSupplies[to] += amount;
-
-            if (_getBorrowBalance(m, from) == 0 && m.userSupplies[from] == 0) {
+            if (_getIBTokenBalance(m, from) == 0 && _getBorrowBalance(m, from) == 0) {
                 _exitMarket(market, from);
             }
         }
@@ -965,7 +969,7 @@ contract IronBank is
         m.userBorrows[to].borrowBalance = newUserBorrowBalance;
         m.userBorrows[to].borrowIndex = m.borrowIndex;
 
-        if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
+        if (_getIBTokenBalance(m, to) == 0 && newUserBorrowBalance == 0) {
             _exitMarket(market, to);
         }
 
@@ -994,7 +998,7 @@ contract IronBank is
     /**
      * @dev Get the account liquidity of a user.
      * @param user The address of the user
-     * @return The totalcollateral value and total debt value of the user
+     * @return The total collateral value and total debt value of the user
      */
     function _getAccountLiquidity(address user) internal view returns (uint256, uint256) {
         uint256 collateralValue;
@@ -1007,7 +1011,7 @@ contract IronBank is
                 continue;
             }
 
-            uint256 supplyBalance = m.userSupplies[user];
+            uint256 supplyBalance = _getIBTokenBalance(m, user);
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
@@ -1040,7 +1044,7 @@ contract IronBank is
                 continue;
             }
 
-            uint256 supplyBalance = m.userSupplies[user];
+            uint256 supplyBalance = _getIBTokenBalance(m, user);
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);

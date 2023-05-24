@@ -81,7 +81,6 @@ contract SupplyTest is Test, Common {
         ib.accrueInterest(address(market1));
         assertEq(ibToken1.balanceOf(user1), 100e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 100e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
     }
 
     function testSupplyMultiple() public {
@@ -120,10 +119,8 @@ contract SupplyTest is Test, Common {
 
         assertEq(ibToken1.balanceOf(user1), 200e18);
         assertEq(ib.getSupplyBalance(user1, address(market1)), 200e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(ibToken1.balanceOf(user2), 200e18);
         assertEq(ib.getSupplyBalance(user2, address(market1)), 200e18);
-        assertTrue(ib.isEnteredMarket(user2, address(market1)));
         assertEq(ibToken1.totalSupply(), 400e18);
         assertEq(ib.getTotalSupply(address(market1)), 400e18);
     }
@@ -146,7 +143,6 @@ contract SupplyTest is Test, Common {
         assertEq(ibToken1.balanceOf(user2), 100e18);
         assertEq(ibToken1.totalSupply(), 100e18);
         assertEq(ib.getSupplyBalance(user2, address(market1)), 100e18);
-        assertTrue(ib.isEnteredMarket(user2, address(market1)));
     }
 
     function testCannotSupplyForInsufficientAllowance() public {

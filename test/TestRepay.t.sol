@@ -96,7 +96,6 @@ contract RepayTest is Test, Common {
          */
         assertEq(ib.getBorrowBalance(user1, address(market1)), 200.041472e18);
         assertEq(debtToken1.balanceOf(user1), 200.041472e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(market1.balanceOf(user1), 200e18);
 
         fastForwardTime(86400);
@@ -126,7 +125,6 @@ contract RepayTest is Test, Common {
         assertLt(ib.getBorrowBalance(user1, address(market1)), 100.06566988e18);
         assertGt(debtToken1.balanceOf(user1), 100.06566987e18);
         assertLt(debtToken1.balanceOf(user1), 100.06566988e18);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
         assertEq(market1.balanceOf(user1), 200e18);
 
         fastForwardTime(86400);
@@ -146,7 +144,6 @@ contract RepayTest is Test, Common {
 
         assertEq(ib.getBorrowBalance(user1, address(market1)), 0);
         assertEq(debtToken1.balanceOf(user1), 0);
-        assertFalse(ib.isEnteredMarket(user1, address(market1)));
         assertLt(market1.balanceOf(user1), 100e18);
 
         // There is no borrower but the total borrow is still greater than 0.

@@ -82,8 +82,6 @@ contract BorrowTest is Test, Common {
         assertEq(market2.balanceOf(user1), market2BorrowAmount);
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
-        assertTrue(ib.isEnteredMarket(user1, address(market2)));
 
         address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(userEnteredMarkets.length, 2);
@@ -126,8 +124,6 @@ contract BorrowTest is Test, Common {
         assertEq(user2Market2BalanceAfter - user2Market2BalanceBefore, market2BorrowAmount);
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
-        assertTrue(ib.isEnteredMarket(user1, address(market2)));
 
         address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(userEnteredMarkets.length, 2);
@@ -167,8 +163,6 @@ contract BorrowTest is Test, Common {
         assertEq(market2.balanceOf(user1), market2BorrowAmount);
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
-        assertTrue(ib.isEnteredMarket(user1, address(market2)));
 
         address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(userEnteredMarkets.length, 2);
@@ -206,8 +200,6 @@ contract BorrowTest is Test, Common {
 
         assertEq(ib.getBorrowBalance(user1, address(market2)), market2BorrowAmount);
         assertEq(debtToken2.balanceOf(user1), market2BorrowAmount);
-        assertTrue(ib.isEnteredMarket(user1, address(market1)));
-        assertTrue(ib.isEnteredMarket(user1, address(market2)));
 
         address[] memory userEnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(userEnteredMarkets.length, 2);

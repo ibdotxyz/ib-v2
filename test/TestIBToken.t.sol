@@ -118,21 +118,23 @@ contract IBTokenTest is Test, Common {
         assertEq(ibToken.balanceOf(user2), 0);
     }
 
-    function testCannotTransferIBTokenForNotListed() public {
+    function testCannotValidateIBTokenTransferForNotListed() public {
         ERC20 notListedMarket = new ERC20("Token", "TOKEN");
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.transferIBToken(address(notListedMarket), user1, user2, 100e18);
+        ib.validateIBTokenTransfer(address(notListedMarket), user1, user2, 100e18);
     }
 
-    function testCannotTransferIBTokenForUnauthorized() public {
+    function testCannotValidateIBTokenTransferForUnauthorized() public {
         vm.prank(user1);
         vm.expectRevert("!authorized");
-        ib.transferIBToken(address(market), user1, user2, 100e18);
+        ib.validateIBTokenTransfer(address(market), user1, user2, 100e18);
     }
 
     function testCannotTransferIBTokenForTransferPaused() public {
+        prepareTransfer();
+
         vm.prank(admin);
         configurator.setMarketTransferPaused(address(market), true);
 
@@ -142,12 +144,16 @@ contract IBTokenTest is Test, Common {
     }
 
     function testCannotTransferIBTokenForSelfTransfer() public {
+        prepareTransfer();
+
         vm.prank(user1);
         vm.expectRevert("cannot self transfer");
         ibToken.transfer(user1, 100e18);
     }
 
     function testCannotTransferIBTokenForTransferToCreditAccount() public {
+        prepareTransfer();
+
         vm.prank(admin);
         creditLimitManager.setCreditLimit(user2, address(market), 100e18);
 

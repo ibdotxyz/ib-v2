@@ -36,6 +36,5 @@ library DataTypes {
         uint256 totalReserves;
         uint256 borrowIndex;
         mapping(address => UserBorrow) userBorrows;
-        mapping(address => uint256) userSupplies;
     }
 }
