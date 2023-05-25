@@ -631,7 +631,7 @@ contract LiquidateTest is Test, Common {
 
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
-        vm.expectRevert("seize too much");
+        vm.expectRevert("transfer amount exceeds balance");
         ib.liquidate(user2, user1, address(market2), address(market3), repayAmount);
         vm.stopPrank();
     }
@@ -657,7 +657,7 @@ contract LiquidateTest is Test, Common {
         vm.startPrank(user2);
         market2.approve(address(ib), repayAmount);
 
-        vm.expectRevert("invalid seize amount");
+        vm.expectRevert("transfer zero amount");
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
         vm.stopPrank();
     }

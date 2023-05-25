@@ -225,6 +225,18 @@ contract RedeemTest is Test, Common {
         ib.redeem(user1, user1, address(market1), redeemAmount);
     }
 
+    function testCannotRedeemForInsufficientBalance() public {
+        uint256 supplyAmount = 100e18;
+        uint256 redeemAmount = 101e18;
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+
+        vm.expectRevert("insufficient balance");
+        ib.redeem(user1, user1, address(market1), redeemAmount);
+    }
+
     function testCannotRedeemForInsufficientCollateral() public {
         uint256 supplyAmount = 100e18;
         uint256 redeemAmount = 20e18;
