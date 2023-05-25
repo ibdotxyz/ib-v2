@@ -954,11 +954,16 @@ contract IronBank is
         internal
         returns (uint256)
     {
-        uint256 newUserBorrowBalance;
+        uint256 borrowBalance = _getBorrowBalance(m, to);
         if (amount == type(uint256).max) {
-            amount = _getBorrowBalance(m, to);
-        } else {
-            newUserBorrowBalance = _getBorrowBalance(m, to) - amount;
+            amount = borrowBalance;
+        }
+
+        require(amount <= borrowBalance, "repay too much");
+
+        uint256 newUserBorrowBalance;
+        unchecked {
+            newUserBorrowBalance = borrowBalance - amount;
         }
 
         // Update internal cash and total borrow in pool.
