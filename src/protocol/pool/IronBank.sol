@@ -325,12 +325,12 @@ contract IronBank is
         // Update storage.
         m.totalCash += amount;
         m.totalSupply += ibTokenAmount;
-
         unchecked {
             // Overflow not possible: supplyBalance + ibTokenAmount is at most totalSupply + ibTokenAmount, which is checked above.
             m.userSupplies[to] += ibTokenAmount;
         }
 
+        // Enter the market.
         if (amount > 0) {
             _enterMarket(market, to);
         }
@@ -361,15 +361,14 @@ contract IronBank is
         _accrueInterest(market, m);
 
         uint256 newTotalBorrow = m.totalBorrow + amount;
-
-        if (m.config.borrowCap != 0) {
-            require(newTotalBorrow <= m.config.borrowCap, "borrow cap reached");
-        }
-
         uint256 newUserBorrowBalance;
         unchecked {
             // Overflow not possible: borrowBalance + amount is at most totalBorrow + amount, which is checked above.
             newUserBorrowBalance = _getBorrowBalance(m, from) + amount;
+        }
+
+        if (m.config.borrowCap != 0) {
+            require(newTotalBorrow <= m.config.borrowCap, "borrow cap reached");
         }
 
         // Update storage.
@@ -377,10 +376,10 @@ contract IronBank is
             m.totalCash -= amount;
         }
         m.totalBorrow = newTotalBorrow;
-
         m.userBorrows[from].borrowBalance = newUserBorrowBalance;
         m.userBorrows[from].borrowIndex = m.borrowIndex;
 
+        // Enter the market.
         if (amount > 0) {
             _enterMarket(market, from);
         }
@@ -394,7 +393,7 @@ contract IronBank is
             _checkAccountLiquidity(from);
         }
 
-        emit Borrow(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
+        emit Borrow(market, from, to, amount, newUserBorrowBalance, newTotalBorrow);
     }
 
     /**
@@ -433,12 +432,12 @@ contract IronBank is
         // Update storage.
         unchecked {
             m.userSupplies[from] = userSupply - ibTokenAmount;
-
             m.totalCash = totalCash - amount;
             // Underflow not possible: ibTokenAmount <= userSupply <= totalSupply.
             m.totalSupply -= ibTokenAmount;
         }
 
+        // Check if need to exit the market.
         if (isRedeemFull && _getBorrowBalance(m, from) == 0) {
             _exitMarket(market, from);
         }
@@ -985,27 +984,27 @@ contract IronBank is
         require(amount <= borrowBalance, "repay too much");
 
         uint256 newUserBorrowBalance;
+        uint256 newTotalBorrow;
         unchecked {
             newUserBorrowBalance = borrowBalance - amount;
+            // Underflow not possible: amount <= userBorrow <= totalBorrow
+            newTotalBorrow = m.totalBorrow - amount;
         }
 
         // Update storage.
         m.userBorrows[to].borrowBalance = newUserBorrowBalance;
         m.userBorrows[to].borrowIndex = m.borrowIndex;
-
         m.totalCash += amount;
-        unchecked {
-            // Underflow not possible: amount <= userBorrow <= totalBorrow
-            m.totalBorrow -= amount;
-        }
+        m.totalBorrow = newTotalBorrow;
 
+        // Check if need to exit the market.
         if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
             _exitMarket(market, to);
         }
 
         IERC20(market).safeTransferFrom(from, address(this), amount);
 
-        emit Repay(market, from, to, amount, newUserBorrowBalance, m.totalBorrow);
+        emit Repay(market, from, to, amount, newUserBorrowBalance, newTotalBorrow);
 
         return amount;
     }
