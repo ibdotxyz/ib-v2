@@ -51,6 +51,16 @@ contract IBToken is
         return market;
     }
 
+    /// @inheritdoc ERC20Upgradeable
+    function totalSupply() public view virtual override returns (uint256) {
+        return IronBankInterface(ironBank).getTotalSupply(market);
+    }
+
+    /// @inheritdoc ERC20Upgradeable
+    function balanceOf(address account) public view override returns (uint256) {
+        return IronBankInterface(ironBank).getIBTokenBalance(account, market);
+    }
+
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /**
@@ -59,9 +69,8 @@ contract IBToken is
      * @param amount The amount of IBToken to transfer
      */
     function transfer(address to, uint256 amount) public override returns (bool) {
-        bool success = super.transfer(to, amount);
-        IronBankInterface(ironBank).validateIBTokenTransfer(market, msg.sender, to, amount);
-        return success;
+        IronBankInterface(ironBank).transferIBToken(market, msg.sender, to, amount);
+        return super.transfer(to, amount);
     }
 
     /**
@@ -71,29 +80,30 @@ contract IBToken is
      * @param amount The amount of IBToken to transfer
      */
     function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
-        bool success = super.transferFrom(from, to, amount);
-        IronBankInterface(ironBank).validateIBTokenTransfer(market, from, to, amount);
-        return success;
+        IronBankInterface(ironBank).transferIBToken(market, from, to, amount);
+        return super.transferFrom(from, to, amount);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
     /**
      * @notice Mint IBToken.
+     * @dev This function will only emit a Transfer event.
      * @param account The address to receive IBToken
      * @param amount The amount of IBToken to mint
      */
     function mint(address account, uint256 amount) external onlyIronBank {
-        _mint(account, amount);
+        emit Transfer(address(0), account, amount);
     }
 
     /**
      * @notice Burn IBToken.
+     * @dev This function will only emit a Transfer event.
      * @param account The address to burn IBToken from
      * @param amount The amount of IBToken to burn
      */
     function burn(address account, uint256 amount) external onlyIronBank {
-        _burn(account, amount);
+        emit Transfer(account, address(0), amount);
     }
 
     /**
@@ -104,7 +114,6 @@ contract IBToken is
      * @param amount The amount of IBToken to seize
      */
     function seize(address from, address to, uint256 amount) external onlyIronBank {
-        require(from != to, "cannot self seize");
         _transfer(from, to, amount);
     }
 
@@ -123,5 +132,10 @@ contract IBToken is
      */
     function _checkIronBank() internal view {
         require(msg.sender == ironBank, "!authorized");
+    }
+
+    /// @inheritdoc ERC20Upgradeable
+    function _transfer(address from, address to, uint256 amount) internal override {
+        emit Transfer(from, to, amount);
     }
 }

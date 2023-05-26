@@ -24,6 +24,8 @@ contract IBTokenTest is Test, Common {
     address user1 = address(128);
     address user2 = address(256);
 
+    event Transfer(address indexed from, address indexed to, uint256 value);
+
     function setUp() public {
         ib = createIronBank(admin);
 
@@ -79,57 +81,63 @@ contract IBTokenTest is Test, Common {
         assertEq(address(market), ibToken.asset());
     }
 
+    function testTotalSupply() public {
+        prepareTransfer();
+
+        assertEq(ibToken.totalSupply(), 10000e18);
+        assertEq(ibToken.totalSupply(), ib.getTotalSupply(address(market)));
+    }
+
+    function testBalanceOf() public {
+        prepareTransfer();
+
+        assertEq(ibToken.balanceOf(user1), 10000e18);
+        assertEq(ibToken.balanceOf(user1), ib.getIBTokenBalance(user1, address(market)));
+    }
+
     function testTransfer() public {
         prepareTransfer();
 
-        vm.prank(user1);
-        ibToken.transfer(user2, 100e18);
-
-        assertEq(ibToken.balanceOf(user2), 100e18);
-    }
-
-    function testTransferWithZeroAmount() public {
-        prepareTransfer();
+        uint256 transferAmount = 100e18;
 
         vm.prank(user1);
-        ibToken.transfer(user2, 0);
+        vm.expectEmit(true, true, false, true, address(ibToken));
+        emit Transfer(user1, user2, transferAmount);
 
-        assertEq(ibToken.balanceOf(user2), 0);
+        ibToken.transfer(user2, transferAmount);
+
+        assertEq(ibToken.balanceOf(user2), transferAmount);
     }
 
     function testTransferFrom() public {
         prepareTransfer();
 
+        uint256 transferAmount = 100e18;
+
         vm.prank(user1);
-        ibToken.approve(user2, 100e18);
+        ibToken.approve(user2, transferAmount);
 
         vm.prank(user2);
-        ibToken.transferFrom(user1, user2, 100e18);
+        vm.expectEmit(true, true, false, true, address(ibToken));
+        emit Transfer(user1, user2, transferAmount);
 
-        assertEq(ibToken.balanceOf(user2), 100e18);
+        ibToken.transferFrom(user1, user2, transferAmount);
+
+        assertEq(ibToken.balanceOf(user2), transferAmount);
     }
 
-    function testTransferFromWithZeroAmount() public {
-        prepareTransfer();
-
-        vm.prank(user2);
-        ibToken.transferFrom(user1, user2, 0);
-
-        assertEq(ibToken.balanceOf(user2), 0);
-    }
-
-    function testCannotValidateIBTokenTransferForNotListed() public {
+    function testCannotTransferIBTokenForNotListed() public {
         ERC20 notListedMarket = new ERC20("Token", "TOKEN");
 
         vm.prank(user1);
         vm.expectRevert("not listed");
-        ib.validateIBTokenTransfer(address(notListedMarket), user1, user2, 100e18);
+        ib.transferIBToken(address(notListedMarket), user1, user2, 100e18);
     }
 
-    function testCannotValidateIBTokenTransferForUnauthorized() public {
+    function testCannotTransferIBTokenForUnauthorized() public {
         vm.prank(user1);
         vm.expectRevert("!authorized");
-        ib.validateIBTokenTransfer(address(market), user1, user2, 100e18);
+        ib.transferIBToken(address(market), user1, user2, 100e18);
     }
 
     function testCannotTransferIBTokenForTransferPaused() public {
@@ -162,6 +170,38 @@ contract IBTokenTest is Test, Common {
         ibToken.transfer(user2, 100e18);
     }
 
+    function testCannotTransferFromTheZeroAddress() public {
+        prepareTransfer();
+
+        vm.prank(user1);
+        vm.expectRevert("transfer from the zero address");
+        ibToken.transferFrom(address(0), user2, 100e18);
+    }
+
+    function testCannotTransferToTheZeroAddress() public {
+        prepareTransfer();
+
+        vm.prank(user1);
+        vm.expectRevert("transfer to the zero address");
+        ibToken.transfer(address(0), 100e18);
+    }
+
+    function testCannotTransferWithZeroAmount() public {
+        prepareTransfer();
+
+        vm.prank(user1);
+        vm.expectRevert("transfer zero amount");
+        ibToken.transfer(user2, 0);
+    }
+
+    function testCannotTransferForTransferAmountExceedsBalance() public {
+        prepareTransfer();
+
+        vm.prank(user1);
+        vm.expectRevert("transfer amount exceeds balance");
+        ibToken.transfer(user2, 10001e18);
+    }
+
     function testCannotTransferIBTokenForInsufficientCollateral() public {
         prepareTransfer();
 
@@ -184,10 +224,44 @@ contract IBTokenTest is Test, Common {
         ibToken.transferFrom(user1, user2, 101e18);
     }
 
+    function testMint() public {
+        address fakeIB = address(512);
+
+        IBToken impl = new IBToken();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        IBToken ibToken2 = IBToken(address(proxy));
+        ibToken2.initialize("Iron Bank Token", "ibToken", admin, fakeIB, address(market));
+
+        uint256 mintAmount = 100e18;
+
+        vm.prank(fakeIB);
+        vm.expectEmit(true, true, false, true, address(ibToken2));
+        emit Transfer(address(0), user1, mintAmount);
+
+        ibToken2.mint(user1, mintAmount);
+    }
+
     function testCannotMintForUnauthorized() public {
         vm.prank(user1);
         vm.expectRevert("!authorized");
         ibToken.mint(user1, 100e18);
+    }
+
+    function testBurn() public {
+        address fakeIB = address(512);
+
+        IBToken impl = new IBToken();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        IBToken ibToken2 = IBToken(address(proxy));
+        ibToken2.initialize("Iron Bank Token", "ibToken", admin, fakeIB, address(market));
+
+        uint256 burnAmount = 100e18;
+
+        vm.prank(fakeIB);
+        vm.expectEmit(true, true, false, true, address(ibToken2));
+        emit Transfer(user1, address(0), burnAmount);
+
+        ibToken2.burn(user1, burnAmount);
     }
 
     function testCannotBurnForUnauthorized() public {
@@ -196,13 +270,7 @@ contract IBTokenTest is Test, Common {
         ibToken.burn(user1, 100e18);
     }
 
-    function testCannotSeizeForUnauthorized() public {
-        vm.prank(user1);
-        vm.expectRevert("!authorized");
-        ibToken.seize(user2, user1, 100e18);
-    }
-
-    function testCannotSeizeForSelfSeize() public {
+    function testSeize() public {
         address fakeIB = address(512);
 
         IBToken impl = new IBToken();
@@ -210,9 +278,19 @@ contract IBTokenTest is Test, Common {
         IBToken ibToken2 = IBToken(address(proxy));
         ibToken2.initialize("Iron Bank Token", "ibToken", admin, fakeIB, address(market));
 
+        uint256 seizeAmount = 100e18;
+
         vm.prank(fakeIB);
-        vm.expectRevert("cannot self seize");
-        ibToken2.seize(user1, user1, 100e18);
+        vm.expectEmit(true, true, false, true, address(ibToken2));
+        emit Transfer(user2, user1, seizeAmount);
+
+        ibToken2.seize(user2, user1, seizeAmount);
+    }
+
+    function testCannotSeizeForUnauthorized() public {
+        vm.prank(user1);
+        vm.expectRevert("!authorized");
+        ibToken.seize(user2, user1, 100e18);
     }
 
     function prepareTransfer() public {

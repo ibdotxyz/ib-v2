@@ -93,16 +93,6 @@ contract IronBank is
     }
 
     /**
-     * @notice Get the IBToken address of a market.
-     * @param market The address of the market
-     * @return The IBToken address
-     */
-    function getIBTokenAddress(address market) public view returns (address) {
-        DataTypes.Market storage m = markets[market];
-        return m.config.ibTokenAddress;
-    }
-
-    /**
      * @notice Get the exchange rate of a market.
      * @param market The address of the market
      * @return The exchange rate
@@ -164,6 +154,17 @@ contract IronBank is
     }
 
     /**
+     * @notice Get the IBToken balance of a user in a market.
+     * @param user The address of the user
+     * @param market The address of the market
+     * @return The IBToken balance
+     */
+    function getIBTokenBalance(address user, address market) public view returns (uint256) {
+        DataTypes.Market storage m = markets[market];
+        return m.userSupplies[user];
+    }
+
+    /**
      * @notice Get the supply balance of a user in a market.
      * @param user The address of the user
      * @param market The address of the market
@@ -171,7 +172,7 @@ contract IronBank is
      */
     function getSupplyBalance(address user, address market) public view returns (uint256) {
         DataTypes.Market storage m = markets[market];
-        return (_getIBTokenBalance(m, user) * _getExchangeRate(m)) / 1e18;
+        return (m.userSupplies[user] * _getExchangeRate(m)) / 1e18;
     }
 
     /**
@@ -321,15 +322,20 @@ contract IronBank is
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
 
-        // Update total cash and total supply in pool.
+        // Update storage.
         m.totalCash += amount;
         m.totalSupply += ibTokenAmount;
+
+        unchecked {
+            // Overflow not possible: supplyBalance + ibTokenAmount is at most totalSupply + ibTokenAmount, which is checked above.
+            m.userSupplies[to] += ibTokenAmount;
+        }
 
         if (amount > 0) {
             _enterMarket(market, to);
         }
 
-        IBTokenInterface(m.config.ibTokenAddress).mint(to, ibTokenAmount);
+        IBTokenInterface(m.config.ibTokenAddress).mint(to, ibTokenAmount); // Only emits Transfer event.
         IERC20(market).safeTransferFrom(from, address(this), amount);
 
         emit Supply(market, from, to, amount, ibTokenAmount);
@@ -354,17 +360,24 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
+        uint256 newTotalBorrow = m.totalBorrow + amount;
+
         if (m.config.borrowCap != 0) {
-            require(m.totalBorrow + amount <= m.config.borrowCap, "borrow cap reached");
+            require(newTotalBorrow <= m.config.borrowCap, "borrow cap reached");
         }
 
-        uint256 newUserBorrowBalance = _getBorrowBalance(m, from) + amount;
+        uint256 newUserBorrowBalance;
+        unchecked {
+            // Overflow not possible: borrowBalance + amount is at most totalBorrow + amount, which is checked above.
+            newUserBorrowBalance = _getBorrowBalance(m, from) + amount;
+        }
 
-        // Update internal cash and total borrow in pool.
-        m.totalCash -= amount;
-        m.totalBorrow += amount;
+        // Update storage.
+        unchecked {
+            m.totalCash -= amount;
+        }
+        m.totalBorrow = newTotalBorrow;
 
-        // Update user borrow status.
         m.userBorrows[from].borrowBalance = newUserBorrowBalance;
         m.userBorrows[from].borrowIndex = m.borrowIndex;
 
@@ -401,27 +414,36 @@ contract IronBank is
 
         _accrueInterest(market, m);
 
+        uint256 userSupply = m.userSupplies[from];
+        uint256 totalCash = m.totalCash;
+
         uint256 ibTokenAmount;
         bool isRedeemFull;
         if (amount == type(uint256).max) {
-            ibTokenAmount = _getIBTokenBalance(m, from);
+            ibTokenAmount = userSupply;
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
             isRedeemFull = true;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
         }
 
-        require(m.totalCash >= amount, "insufficient cash");
+        require(userSupply >= ibTokenAmount, "insufficient balance");
+        require(totalCash >= amount, "insufficient cash");
 
-        // Update internal cash and total supply in pool.
-        m.totalCash -= amount;
-        m.totalSupply -= ibTokenAmount;
+        // Update storage.
+        unchecked {
+            m.userSupplies[from] = userSupply - ibTokenAmount;
+
+            m.totalCash = totalCash - amount;
+            // Underflow not possible: ibTokenAmount <= userSupply <= totalSupply.
+            m.totalSupply -= ibTokenAmount;
+        }
 
         if (isRedeemFull && _getBorrowBalance(m, from) == 0) {
             _exitMarket(market, from);
         }
 
-        IBTokenInterface(m.config.ibTokenAddress).burn(from, ibTokenAmount);
+        IBTokenInterface(m.config.ibTokenAddress).burn(from, ibTokenAmount); // Only emits Transfer event.
         IERC20(market).safeTransfer(to, amount);
 
         _checkAccountLiquidity(from);
@@ -481,14 +503,9 @@ contract IronBank is
         repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
         // Seize the collateral.
-        uint256 borrowerIBTokenBalance = _getIBTokenBalance(mCollateral, borrower);
         uint256 ibTokenAmount = _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
-        require(ibTokenAmount > 0, "invalid seize amount");
-        require(borrowerIBTokenBalance >= ibTokenAmount, "seize too much");
-        IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount);
-
-        // Update the enter market of both borrower and liquidator after the IBToken is seized.
-        _updateEnteredMarket(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
+        _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
+        IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount); // Only emits Transfer event.
 
         emit Liquidate(liquidator, borrower, marketBorrow, marketCollateral, repayAmount, ibTokenAmount);
     }
@@ -534,14 +551,14 @@ contract IronBank is
     }
 
     /**
-     * @notice Validate a transfer of IBToken.
-     * @dev This function is callable by the IBToken contract only and should be called after the IBToken balance is updated.
+     * @notice Transfer IBToken from one account to another.
+     * @dev This function is callable by the IBToken contract only.
      * @param market The address of the market
      * @param from The address to transfer from
      * @param to The address to transfer to
      * @param amount The amount to transfer
      */
-    function validateIBTokenTransfer(address market, address from, address to, uint256 amount) external {
+    function transferIBToken(address market, address from, address to, uint256 amount) external {
         DataTypes.Market storage m = markets[market];
         require(m.config.isListed, "not listed");
         require(msg.sender == m.config.ibTokenAddress, "!authorized");
@@ -550,7 +567,7 @@ contract IronBank is
         require(!isCreditAccount(to), "cannot transfer to credit account");
 
         _accrueInterest(market, m);
-        _updateEnteredMarket(market, m, from, to, amount);
+        _transferIBToken(market, m, from, to, amount);
 
         _checkAccountLiquidity(from);
     }
@@ -672,8 +689,10 @@ contract IronBank is
         require(m.totalReserves >= ibTokenAmount, "insufficient reserves");
 
         // Update internal cash, and total reserves.
-        m.totalCash -= amount;
-        m.totalReserves -= ibTokenAmount;
+        unchecked {
+            m.totalCash -= amount;
+            m.totalReserves -= ibTokenAmount;
+        }
 
         IERC20(market).safeTransfer(recipient, amount);
 
@@ -785,10 +804,11 @@ contract IronBank is
      * @return The exchange rate
      */
     function _getExchangeRate(DataTypes.Market storage m) internal view returns (uint256) {
-        if (m.totalSupply + m.totalReserves == 0) {
+        uint256 totalSupplyPlusReserves = m.totalSupply + m.totalReserves;
+        if (totalSupplyPlusReserves == 0) {
             return m.config.initialExchangeRate;
         }
-        return ((m.totalCash + m.totalBorrow) * 1e18) / (m.totalSupply + m.totalReserves);
+        return ((m.totalCash + m.totalBorrow) * 1e18) / totalSupplyPlusReserves;
     }
 
     /**
@@ -836,31 +856,34 @@ contract IronBank is
     }
 
     /**
-     * @dev Get the IBToken balance of a user.
-     * @param m The storage of the market
-     * @param user The address of the user
-     * @return The IBToken balance
-     */
-    function _getIBTokenBalance(DataTypes.Market storage m, address user) internal view returns (uint256) {
-        return IERC20(m.config.ibTokenAddress).balanceOf(user);
-    }
-
-    /**
-     * @dev Update the entered market of a user when a IBToken transfer happens.
+     * @dev Transfer IBToken from one account to another.
      * @param market The address of the market
+     * @param m The storage of the market
      * @param from The address to transfer from
      * @param to The address to transfer to
      * @param amount The amount to transfer
      */
-    function _updateEnteredMarket(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
+    function _transferIBToken(address market, DataTypes.Market storage m, address from, address to, uint256 amount)
         internal
     {
-        if (amount > 0) {
-            _enterMarket(market, to);
+        require(from != address(0), "transfer from the zero address");
+        require(to != address(0), "transfer to the zero address");
 
-            if (_getIBTokenBalance(m, from) == 0 && _getBorrowBalance(m, from) == 0) {
-                _exitMarket(market, from);
-            }
+        uint256 fromBalance = m.userSupplies[from];
+        require(amount > 0, "transfer zero amount");
+        require(fromBalance >= amount, "transfer amount exceeds balance");
+
+        _enterMarket(market, to);
+
+        unchecked {
+            m.userSupplies[from] = fromBalance - amount;
+            // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
+            // decrementing then incrementing.
+            m.userSupplies[to] += amount;
+        }
+
+        if (m.userSupplies[from] == 0 && _getBorrowBalance(m, from) == 0) {
+            _exitMarket(market, from);
         }
     }
 
@@ -966,15 +989,17 @@ contract IronBank is
             newUserBorrowBalance = borrowBalance - amount;
         }
 
-        // Update internal cash and total borrow in pool.
-        m.totalCash += amount;
-        m.totalBorrow -= amount;
-
-        // Update user borrow status.
+        // Update storage.
         m.userBorrows[to].borrowBalance = newUserBorrowBalance;
         m.userBorrows[to].borrowIndex = m.borrowIndex;
 
-        if (_getIBTokenBalance(m, to) == 0 && newUserBorrowBalance == 0) {
+        m.totalCash += amount;
+        unchecked {
+            // Underflow not possible: amount <= userBorrow <= totalBorrow
+            m.totalBorrow -= amount;
+        }
+
+        if (m.userSupplies[to] == 0 && newUserBorrowBalance == 0) {
             _exitMarket(market, to);
         }
 
@@ -1016,7 +1041,7 @@ contract IronBank is
                 continue;
             }
 
-            uint256 supplyBalance = _getIBTokenBalance(m, user);
+            uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
@@ -1049,7 +1074,7 @@ contract IronBank is
                 continue;
             }
 
-            uint256 supplyBalance = _getIBTokenBalance(m, user);
+            uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
             uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);

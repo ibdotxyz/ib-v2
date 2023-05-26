@@ -21,11 +21,11 @@ interface IronBankInterface {
 
     function getBorrowBalance(address user, address market) external view returns (uint256);
 
+    function getIBTokenBalance(address user, address market) external view returns (uint256);
+
     function getSupplyBalance(address user, address market) external view returns (uint256);
 
     function isMarketListed(address market) external view returns (bool);
-
-    function getIBTokenAddress(address market) external view returns (address);
 
     function getTotalSupply(address market) external view returns (uint256);
 
@@ -35,7 +35,7 @@ interface IronBankInterface {
 
     function getTotalReserves(address market) external view returns (uint256);
 
-    function validateIBTokenTransfer(address market, address from, address to, uint256 amount) external;
+    function transferIBToken(address market, address from, address to, uint256 amount) external;
 
     /* ========== MARKET CONFIGURATOR INTERFACES ========== */
 

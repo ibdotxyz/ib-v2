@@ -159,14 +159,12 @@ contract IronBankLens is Constants {
         view
         returns (UserMarketStatus memory)
     {
-        address ibTokenAddress = ironBank.getIBTokenAddress(market);
-
         return UserMarketStatus({
             market: market,
             balance: IERC20(market).balanceOf(user),
             allowanceToIronBank: IERC20(market).allowance(user, address(ironBank)),
             exchangeRate: ironBank.getExchangeRate(market),
-            ibTokenBalance: IERC20(ibTokenAddress).balanceOf(user),
+            ibTokenBalance: ironBank.getIBTokenBalance(user, market),
             supplyBalance: ironBank.getSupplyBalance(user, market),
             borrowBalance: ironBank.getBorrowBalance(user, market)
         });
@@ -184,7 +182,6 @@ contract IronBankLens is Constants {
         public
         returns (UserMarketStatus memory)
     {
-        address ibTokenAddress = ironBank.getIBTokenAddress(market);
         ironBank.accrueInterest(market);
 
         return UserMarketStatus({
@@ -192,7 +189,7 @@ contract IronBankLens is Constants {
             balance: IERC20(market).balanceOf(user),
             allowanceToIronBank: IERC20(market).allowance(user, address(ironBank)),
             exchangeRate: ironBank.getExchangeRate(market),
-            ibTokenBalance: IERC20(ibTokenAddress).balanceOf(user),
+            ibTokenBalance: ironBank.getIBTokenBalance(user, market),
             supplyBalance: ironBank.getSupplyBalance(user, market),
             borrowBalance: ironBank.getBorrowBalance(user, market)
         });
