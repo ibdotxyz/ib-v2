@@ -155,6 +155,7 @@ contract BorrowTest is Test, Common {
     function testGetMarketStatus() public {
         IronBankLens.MarketStatus memory status = lens.getMarketStatus(ib, address(market2));
 
+        assertEq(status.market, address(market2));
         assertEq(status.totalCash, 200e18); // 500 - 300
         assertEq(status.totalBorrow, 300e18);
         assertEq(status.totalSupply, 500e18);
@@ -230,6 +231,7 @@ contract BorrowTest is Test, Common {
          * exchange rate = (200 + 300.041472) / (500 + 0.004146890436287687) = 1.0000746496
          */
         IronBankLens.MarketStatus memory status = abi.decode(data, (IronBankLens.MarketStatus));
+        assertEq(status.market, address(market2));
         assertEq(status.totalCash, 200e18); // 500 - 300
         assertEq(status.totalBorrow, 300.041472e18);
         assertEq(status.totalSupply, 500e18);
@@ -246,6 +248,7 @@ contract BorrowTest is Test, Common {
         IronBankLens.MarketStatus[] memory status = lens.getAllMarketsStatus(ib);
 
         assertEq(status.length, 2);
+        assertEq(status[0].market, address(market1));
         assertEq(status[0].totalCash, 100e18);
         assertEq(status[0].totalBorrow, 0);
         assertEq(status[0].totalSupply, 100e18);
@@ -256,6 +259,7 @@ contract BorrowTest is Test, Common {
         assertEq(status[0].exchangeRate, 1e18);
         assertEq(status[0].supplyRate, irm.getSupplyRate(100e18, 0));
         assertEq(status[0].borrowRate, irm.getBorrowRate(100e18, 0));
+        assertEq(status[1].market, address(market2));
         assertEq(status[1].totalCash, 200e18); // 500 - 300
         assertEq(status[1].totalBorrow, 300e18);
         assertEq(status[1].totalSupply, 500e18);
@@ -278,6 +282,7 @@ contract BorrowTest is Test, Common {
         IronBankLens.MarketStatus[] memory status = abi.decode(data, (IronBankLens.MarketStatus[]));
         assertEq(status.length, 2);
 
+        assertEq(status[0].market, address(market1));
         assertEq(status[0].totalCash, 100e18);
         assertEq(status[0].totalBorrow, 0);
         assertEq(status[0].totalSupply, 100e18);
@@ -298,6 +303,7 @@ contract BorrowTest is Test, Common {
          * total reserves = 0 + 500 * 0.0041472 / (200 + 300 + 0.041472 - 0.0041472) = 0.004146890436287687
          * exchange rate = (200 + 300.041472) / (500 + 0.004146890436287687) = 1.0000746496
          */
+        assertEq(status[1].market, address(market2));
         assertEq(status[1].totalCash, 200e18); // 500 - 300
         assertEq(status[1].totalBorrow, 300.041472e18);
         assertEq(status[1].totalSupply, 500e18);
@@ -314,6 +320,8 @@ contract BorrowTest is Test, Common {
         IronBankLens.UserMarketStatus memory status = lens.getUserMarketStatus(ib, user1, address(market2));
 
         assertEq(status.market, address(market2));
+        assertEq(status.balance, 300e18); // borrow 300
+        assertEq(status.allowanceToIronBank, 0);
         assertEq(status.exchangeRate, 1e18);
         assertEq(status.ibTokenBalance, 0);
         assertEq(status.supplyBalance, 0);
@@ -333,6 +341,8 @@ contract BorrowTest is Test, Common {
         IronBankLens.UserMarketStatus memory status = abi.decode(data, (IronBankLens.UserMarketStatus));
 
         assertEq(status.market, address(market2));
+        assertEq(status.balance, 300e18); // borrow 300
+        assertEq(status.allowanceToIronBank, 0);
         assertEq(status.exchangeRate, 1.0000746496e18);
         assertEq(status.ibTokenBalance, 0);
         assertEq(status.supplyBalance, 0);
@@ -344,11 +354,15 @@ contract BorrowTest is Test, Common {
 
         assertEq(status.length, 2);
         assertEq(status[0].market, address(market1));
+        assertEq(status[0].balance, 9900e18); // 10000 - 100
+        assertEq(status[0].allowanceToIronBank, 0);
         assertEq(status[0].exchangeRate, 1e18);
         assertEq(status[0].ibTokenBalance, 100e18);
         assertEq(status[0].supplyBalance, 100e18);
         assertEq(status[0].borrowBalance, 0);
         assertEq(status[1].market, address(market2));
+        assertEq(status[1].balance, 300e18); // borrow 300
+        assertEq(status[1].allowanceToIronBank, 0);
         assertEq(status[1].exchangeRate, 1e18);
         assertEq(status[1].ibTokenBalance, 0);
         assertEq(status[1].supplyBalance, 0);
@@ -367,11 +381,15 @@ contract BorrowTest is Test, Common {
 
         assertEq(status.length, 2);
         assertEq(status[0].market, address(market1));
+        assertEq(status[0].balance, 9900e18); // 10000 - 100
+        assertEq(status[0].allowanceToIronBank, 0);
         assertEq(status[0].exchangeRate, 1e18);
         assertEq(status[0].ibTokenBalance, 100e18);
         assertEq(status[0].supplyBalance, 100e18);
         assertEq(status[0].borrowBalance, 0);
         assertEq(status[1].market, address(market2));
+        assertEq(status[1].balance, 300e18); // borrow 300
+        assertEq(status[1].allowanceToIronBank, 0);
         assertEq(status[1].exchangeRate, 1.0000746496e18);
         assertEq(status[1].ibTokenBalance, 0);
         assertEq(status[1].supplyBalance, 0);
