@@ -38,6 +38,7 @@ contract IronBankLens is Constants {
     }
 
     struct MarketStatus {
+        address market;
         uint256 totalCash;
         uint256 totalBorrow;
         uint256 totalSupply;
@@ -52,6 +53,8 @@ contract IronBankLens is Constants {
 
     struct UserMarketStatus {
         address market;
+        uint256 balance;
+        uint256 allowanceToIronBank;
         uint256 exchangeRate;
         uint256 ibTokenBalance;
         uint256 supplyBalance;
@@ -160,6 +163,8 @@ contract IronBankLens is Constants {
 
         return UserMarketStatus({
             market: market,
+            balance: IERC20(market).balanceOf(user),
+            allowanceToIronBank: IERC20(market).allowance(user, address(ironBank)),
             exchangeRate: ironBank.getExchangeRate(market),
             ibTokenBalance: IERC20(ibTokenAddress).balanceOf(user),
             supplyBalance: ironBank.getSupplyBalance(user, market),
@@ -184,6 +189,8 @@ contract IronBankLens is Constants {
 
         return UserMarketStatus({
             market: market,
+            balance: IERC20(market).balanceOf(user),
+            allowanceToIronBank: IERC20(market).allowance(user, address(ironBank)),
             exchangeRate: ironBank.getExchangeRate(market),
             ibTokenBalance: IERC20(ibTokenAddress).balanceOf(user),
             supplyBalance: ironBank.getSupplyBalance(user, market),
@@ -302,6 +309,7 @@ contract IronBankLens is Constants {
         }
 
         return MarketStatus({
+            market: market,
             totalCash: totalCash,
             totalBorrow: totalBorrow,
             totalSupply: totalSupply,
