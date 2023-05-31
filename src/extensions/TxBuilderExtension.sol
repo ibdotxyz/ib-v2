@@ -274,6 +274,7 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
      */
     function redeemNativeToken(address user, uint256 redeemAmount) internal nonReentrant {
         if (redeemAmount == type(uint256).max) {
+            ironBank.accrueInterest(weth);
             redeemAmount = ironBank.getSupplyBalance(user, weth);
         }
         ironBank.redeem(user, address(this), weth, redeemAmount);
