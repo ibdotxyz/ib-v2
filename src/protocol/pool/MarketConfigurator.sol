@@ -457,7 +457,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     }
 
     /**
-     * @dev List a vanila market or a pToken market.
+     * @dev List a vanilla market or a pToken market. Markets that were delisted can't be listed again.
      * @param market The market to be listed
      * @param ibTokenAddress The ibToken of the market
      * @param debtTokenAddress The debtToken of the market
@@ -475,6 +475,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     ) internal {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
+        require(!config.isDelisted, "already delisted");
         require(IBTokenInterface(ibTokenAddress).asset() == market, "mismatch market");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
