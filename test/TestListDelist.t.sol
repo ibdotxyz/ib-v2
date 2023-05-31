@@ -148,6 +148,21 @@ contract ListDelistTest is Test, Common {
         vm.stopPrank();
     }
 
+    function testCannotListMarketForAlreadyDelisted() public {
+        ERC20 market = new ERC20("Token", "TOKEN");
+        IBToken ibToken = createIBToken(admin, address(ib), address(market));
+        DebtToken debtToken = createDebtToken(admin, address(ib), address(market));
+
+        vm.startPrank(admin);
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
+        configurator.softDelistMarket(address(market));
+        configurator.hardDelistMarket(address(market));
+
+        vm.expectRevert("already delisted");
+        configurator.listMarket(address(market), address(ibToken), address(debtToken), address(irm), reserveFactor);
+        vm.stopPrank();
+    }
+
     function testCannotListMarketForMismatchMarket() public {
         ERC20 market = new ERC20("Token", "TOKEN");
         ERC20 market2 = new ERC20("Token", "TOKEN");

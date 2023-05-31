@@ -185,24 +185,6 @@ contract IronBankTest is Test, Common {
         ib.listMarket(address(market), emptyConfig);
     }
 
-    function testCannotListMarketForAlreadyListed() public {
-        address configurator = address(256);
-
-        vm.prank(admin);
-        ib.setMarketConfigurator(configurator);
-
-        ERC20 market = new ERC20("Token", "TOKEN");
-        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
-        config.isListed = true;
-
-        vm.prank(configurator);
-        ib.listMarket(address(market), config);
-
-        vm.prank(configurator);
-        vm.expectRevert("already listed");
-        ib.listMarket(address(market), config);
-    }
-
     function testDelistMarket() public {
         address configurator = address(256);
 
@@ -221,6 +203,10 @@ contract IronBankTest is Test, Common {
         emit MarketDelisted(address(market));
 
         ib.delistMarket(address(market));
+
+        config = ib.getMarketConfiguration(address(market));
+        assertFalse(config.isListed);
+        assertTrue(config.isDelisted);
     }
 
     function testCannotDelistMarketForNotMarketConfigurator() public {
@@ -228,19 +214,6 @@ contract IronBankTest is Test, Common {
 
         vm.prank(admin);
         vm.expectRevert("!configurator");
-        ib.delistMarket(address(market));
-    }
-
-    function testCannotDelistMarketForNotListed() public {
-        address configurator = address(256);
-
-        vm.prank(admin);
-        ib.setMarketConfigurator(configurator);
-
-        ERC20 market = new ERC20("Token", "TOKEN");
-
-        vm.prank(configurator);
-        vm.expectRevert("not listed");
         ib.delistMarket(address(market));
     }
 
@@ -272,20 +245,6 @@ contract IronBankTest is Test, Common {
 
         vm.prank(admin);
         vm.expectRevert("!configurator");
-        ib.setMarketConfiguration(address(market), config);
-    }
-
-    function testCannotSetMarketConfigurationForNotListed() public {
-        address configurator = address(256);
-
-        vm.prank(admin);
-        ib.setMarketConfigurator(configurator);
-
-        ERC20 market = new ERC20("Token", "TOKEN");
-        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market));
-
-        vm.prank(configurator);
-        vm.expectRevert("not listed");
         ib.setMarketConfiguration(address(market), config);
     }
 
