@@ -53,11 +53,11 @@ contract TripleSlopeRateModel is InterestRateModelInterface {
             // base + utilization * slope1
             return baseBorrowPerSecond + (utilization * borrowPerSecond1) / 1e18;
         } else if (utilization <= kink2) {
-            // base + kink1 * slope1 + (utilization - kink2) * slope2
+            // base + kink1 * slope1 + (utilization - kink1) * slope2
             return baseBorrowPerSecond + (kink1 * borrowPerSecond1) / 1e18
                 + ((utilization - kink1) * borrowPerSecond2) / 1e18;
         } else {
-            // base + kink1 * slope1 + (kink2 - kink2) * slope2 + (utilization - kink2) * slope3
+            // base + kink1 * slope1 + (kink2 - kink1) * slope2 + (utilization - kink2) * slope3
             return baseBorrowPerSecond + (kink1 * borrowPerSecond1) / 1e18 + ((kink2 - kink1) * borrowPerSecond2) / 1e18
                 + (utilization - kink2) * borrowPerSecond3 / 1e18;
         }
