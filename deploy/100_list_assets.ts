@@ -1,7 +1,5 @@
-import { formatUnits } from "ethers/lib/utils";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
-import { parse } from "path";
 
 const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deployments, ethers, getNamedAccounts } = hre;
@@ -24,16 +22,53 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const stableIRMAddress = (await get("StableIRM")).address;
 
   const wethAddress = (await get("WETH")).address;
+  const wstETHAddress = (await get("WstETH")).address;
+  const wbtcAddress = await deploy("WBTC", {
+    from: deployer,
+    contract: "MockERC20",
+    args: ["Wrapped BTC", "WBTC", 8, deployer],
+    log: true,
+  });
   const usdc = await deploy("USDC", {
     from: deployer,
     contract: "MockERC20",
     args: ["USD Coin", "USDC", 6, deployer],
     log: true,
   });
+  const usdt = await deploy("USDT", {
+    from: deployer,
+    contract: "MockERC20",
+    args: ["Tether USD", "USDT", 6, deployer],
+    log: true,
+  });
+
+  const pWETH = await deploy("pWETH", {
+    from: deployer,
+    contract: "PToken",
+    args: ["Protected WETH", "pWETH", wethAddress],
+    log: true,
+  });
+
+  const pUSDC = await deploy("pUSDC", {
+    from: deployer,
+    contract: "PToken",
+    args: ["Protected USDC", "pUSDC", usdc.address],
+    log: true,
+  });
 
   const assetToList = [
-    ["WETH", wethAddress, majorIRMAddress, "1800", "0.2", "0.82", "0.9", "1.05"],
-    ["USDC", usdc.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.1"],
+    ["WETH", wethAddress, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
+    ["WSTETH", wstETHAddress, majorIRMAddress, "2141", "0.2", "0.8", "0.9", "1.1"],
+    ["WBTC", wbtcAddress.address, majorIRMAddress, "27892", "0.2", "0.75", "0.85", "1.05"],
+    ["USDC", usdc.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+    ["USDT", usdt.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+    ["PWETH", pWETH.address, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
+    ["PUSDC", pUSDC.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+  ];
+
+  const marketPTokens = [
+    [wethAddress, pWETH.address],
+    [usdc.address, pUSDC.address],
   ];
 
   for (const [symbol, underlying, irm, price, rf, cf, lt, lb] of assetToList) {

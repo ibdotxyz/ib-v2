@@ -18,6 +18,7 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
   const txBuilderExtAddress = (await deployments.get("TxBuilderExtension")).address;
 
   await execute("USDC", { from: admin, log: true }, "transfer", user2, parseUnits("500000", 6));
+  await execute("USDC", { from: admin, log: true }, "transfer", user1, parseUnits("10000", 6));
   await execute("USDC", { from: user2, log: true }, "approve", ironBankAddress, parseUnits("500000", 6));
   await execute("IronBank", { from: user2, log: true }, "supply", user2, user2, usdcAddress, parseUnits("500000", 6));
 
