@@ -1,5 +1,12 @@
 import { DeployFunction } from "hardhat-deploy/dist/types";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
+import { ethers } from "hardhat";
+
+async function getDecimal(deployResult: any): Promise<number> {
+  const contract = await ethers.getContractAt("MockERC20", deployResult.address);
+  const decimal = await contract.decimals();
+  return decimal;
+}
 
 const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const { deployments, ethers, getNamedAccounts } = hre;
@@ -21,9 +28,9 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const majorIRMAddress = (await get("MajorIRM")).address;
   const stableIRMAddress = (await get("StableIRM")).address;
 
-  const wethAddress = (await get("WETH")).address;
-  const wstETHAddress = (await get("WstETH")).address;
-  const wbtcAddress = await deploy("WBTC", {
+  const weth = await get("WETH");
+  const wstETH = await get("WstETH");
+  const wbtc = await deploy("WBTC", {
     from: deployer,
     contract: "MockERC20",
     args: ["Wrapped BTC", "WBTC", 8, deployer],
@@ -45,7 +52,7 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   const pWETH = await deploy("pWETH", {
     from: deployer,
     contract: "PToken",
-    args: ["Protected WETH", "pWETH", wethAddress],
+    args: ["Protected WETH", "pWETH", weth.address],
     log: true,
   });
 
@@ -56,18 +63,18 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
     log: true,
   });
 
-  const assetToList = [
-    ["WETH", wethAddress, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
-    ["WSTETH", wstETHAddress, majorIRMAddress, "2141", "0.2", "0.8", "0.9", "1.1"],
-    ["WBTC", wbtcAddress.address, majorIRMAddress, "27892", "0.2", "0.75", "0.85", "1.05"],
-    ["USDC", usdc.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
-    ["USDT", usdt.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
-    ["PWETH", pWETH.address, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
-    ["PUSDC", pUSDC.address, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+  const assetToList: any = [
+    ["WETH", weth, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
+    ["WSTETH", wstETH, majorIRMAddress, "2141", "0.2", "0.8", "0.9", "1.1"],
+    ["WBTC", wbtc, majorIRMAddress, "27892", "0.2", "0.75", "0.85", "1.05"],
+    ["USDC", usdc, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+    ["USDT", usdt, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
+    ["PWETH", pWETH, majorIRMAddress, "1899", "0.2", "0.82", "0.9", "1.05"],
+    ["PUSDC", pUSDC, stableIRMAddress, "1", "0.15", "0.86", "0.9", "1.08"],
   ];
 
   const marketPTokens = [
-    [wethAddress, pWETH.address],
+    [weth.address, pWETH.address],
     [usdc.address, pUSDC.address],
   ];
 
@@ -92,7 +99,7 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       `ib${symbol}`,
       admin,
       ironBankAddress,
-      underlying
+      underlying.address
     );
 
     const debtToken = await deploy(`debt${symbol}`, {
@@ -115,26 +122,32 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       `debt${symbol}`,
       admin,
       ironBankAddress,
-      underlying
+      underlying.address
     );
 
     await execute(
       "MarketConfigurator",
       { from: deployer, log: true },
       "listMarket",
-      underlying,
+      underlying.address,
       ibToken.address,
       debtToken.address,
       irm,
       parseUnits(rf, 4)
     );
 
-    await execute("PriceOracle", { from: deployer, log: true }, "setPrice", underlying, parseUnits(price, 18));
+    await execute(
+      "PriceOracle",
+      { from: deployer, log: true },
+      "setPrice",
+      underlying.address,
+      parseUnits(price, 18 + 18 - (await getDecimal(underlying)))
+    );
     await execute(
       "MarketConfigurator",
       { from: deployer, log: true },
       "configureMarketAsCollateral",
-      underlying,
+      underlying.address,
       parseUnits(cf, 4),
       parseUnits(lt, 4),
       parseUnits(lb, 4)
