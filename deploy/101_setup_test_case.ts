@@ -17,6 +17,32 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
   const ironBankAddress = (await get("IronBank")).address;
   const txBuilderExtAddress = (await deployments.get("TxBuilderExtension")).address;
 
+  await execute("WBTC", { from: admin, log: true }, "approve", ironBankAddress, parseUnits("100", 8));
+  await execute(
+    "IronBank",
+    { from: admin, log: true },
+    "supply",
+    admin,
+    admin,
+    (
+      await get("WBTC")
+    ).address,
+    parseUnits("100", 8)
+  );
+  await execute("USDT", { from: admin, log: true }, "approve", ironBankAddress, parseUnits("100000", 6));
+  await execute(
+    "IronBank",
+    { from: admin, log: true },
+    "supply",
+    admin,
+    admin,
+    (
+      await get("USDT")
+    ).address,
+    parseUnits("100000", 6)
+  );
+
+  await execute("StETH", { from: admin, log: true }, "transfer", user1, parseEther("100"));
   await execute("USDC", { from: admin, log: true }, "transfer", user2, parseUnits("500000", 6));
   await execute("USDC", { from: admin, log: true }, "transfer", user1, parseUnits("10000", 6));
   await execute("USDC", { from: user2, log: true }, "approve", ironBankAddress, parseUnits("500000", 6));
@@ -27,7 +53,7 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
     [formatBytes32String("ACTION_SUPPLY_NATIVE_TOKEN"), "0x"],
     [
       formatBytes32String("ACTION_BORROW"),
-      defaultAbiCoder.encode(["address", "uint256"], [usdcAddress, parseUnits("3000", 6)]),
+      defaultAbiCoder.encode(["address", "uint256"], [usdcAddress, parseUnits("15571", 6)]),
     ],
   ]);
 };
