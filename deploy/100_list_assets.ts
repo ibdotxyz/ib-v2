@@ -153,6 +153,10 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
       parseUnits(lb, 4)
     );
   }
+
+  for (const [underlying, pToken] of marketPTokens) {
+    await execute("MarketConfigurator", { from: deployer, log: true }, "setMarketPToken", underlying, pToken);
+  }
 };
 
 deployFn.tags = ["ListMarkets", "deploy"];
