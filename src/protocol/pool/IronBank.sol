@@ -515,7 +515,7 @@ contract IronBank is
      * @param user The address of the user
      * @param data The data to pass to the callback
      */
-    function deferLiquidityCheck(address user, bytes memory data) external {
+    function deferLiquidityCheck(address user, bytes memory data) external isAuthorized(user) {
         require(!isCreditAccount(user), "credit account cannot defer liquidity check");
         require(liquidityCheckStatus[user] == LIQUIDITY_CHECK_NORMAL, "reentry defer liquidity check");
         liquidityCheckStatus[user] = LIQUIDITY_CHECK_DEFERRED;
