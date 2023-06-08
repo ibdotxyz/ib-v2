@@ -75,7 +75,7 @@ contract FlashLoan is IERC3156FlashLender, DeferLiquidityCheckInterface {
     }
 
     /// @inheritdoc DeferLiquidityCheckInterface
-    function onDeferredLiquidityCheck(bytes memory encodedData) external override {
+    function onDeferredLiquidityCheck(bytes memory encodedData) external payable override {
         require(msg.sender == ironBank, "untrusted message sender");
         (IERC3156FlashBorrower receiver, address token, uint256 amount, bytes memory data, address msgSender) =
             abi.decode(encodedData, (IERC3156FlashBorrower, address, uint256, bytes, address));

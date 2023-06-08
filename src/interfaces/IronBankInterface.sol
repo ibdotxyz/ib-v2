@@ -17,7 +17,7 @@ interface IronBankInterface {
 
     function repay(address from, address to, address asset, uint256 amount) external;
 
-    function deferLiquidityCheck(address user, bytes memory data) external;
+    function deferLiquidityCheck(address user, bytes memory data) external payable;
 
     function getBorrowBalance(address user, address market) external view returns (uint256);
 
