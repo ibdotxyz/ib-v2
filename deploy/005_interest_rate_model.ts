@@ -12,9 +12,9 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
 
   let baseRate = 0;
   let slope1 = parseEther("0.15").div(secondsPerYear);
-  let kink1 = parseEther("0.8").div(secondsPerYear);
+  let kink1 = parseEther("0.8");
   let slope2 = parseEther("0");
-  let kink2 = parseEther("0.9").div(secondsPerYear);
+  let kink2 = parseEther("0.9");
   let slope3 = parseEther("5").div(secondsPerYear);
   await deploy("MajorIRM", {
     from: deployer,
@@ -33,8 +33,8 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
   });
 
   slope1 = parseEther("0.2").div(secondsPerYear);
-  kink1 = parseEther("0.7").div(secondsPerYear);
-  kink2 = parseEther("0.8").div(secondsPerYear);
+  kink1 = parseEther("0.7");
+  kink2 = parseEther("0.8");
   slope3 = parseEther("5").div(secondsPerYear);
   await deploy("GovIRM", {
     from: deployer,
