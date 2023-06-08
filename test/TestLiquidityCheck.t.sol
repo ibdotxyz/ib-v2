@@ -99,6 +99,26 @@ contract Example4 is DeferLiquidityCheckInterface {
     }
 }
 
+contract Example5 is DeferLiquidityCheckInterface {
+    IronBank ib;
+
+    constructor(IronBank _ib) {
+        ib = _ib;
+    }
+
+    function execute(address market) external {
+        // Defer the liquidity check for itself.
+        ib.deferLiquidityCheck(address(this), abi.encode(market));
+    }
+
+    function onDeferredLiquidityCheck(bytes memory data) external override {
+        (address market) = abi.decode(data, (address));
+
+        // Basically do nothing.
+        ib.accrueInterest(market);
+    }
+}
+
 contract AccountLiquidityTest is Test, Common {
     uint16 internal constant reserveFactor = 1000; // 10%
 
@@ -233,6 +253,24 @@ contract AccountLiquidityTest is Test, Common {
         assertEq(ib.getBorrowBalance(user1, address(market2)), borrowAmount);
     }
 
+    function testDeferLiquidityCheck4() public {
+        Example5 example = new Example5(ib);
+
+        vm.prank(user1);
+        // Will not revert with "!authorized" since the example contract defers the liquidity check for itself.
+        example.execute(address(market1));
+    }
+
+    function testCannotDeferLiquidityCheckForNotAuthorized() public {
+        Example1 example = new Example1(ib);
+
+        uint256 supplyAmount = 100e18;
+
+        vm.prank(user1);
+        vm.expectRevert("!authorized");
+        example.execute(address(market1), supplyAmount);
+    }
+
     function testCannotDeferLiquidityCheckForNotImplementingCallback() public {
         vm.prank(user1);
         vm.expectRevert(bytes(""));
@@ -240,29 +278,27 @@ contract AccountLiquidityTest is Test, Common {
     }
 
     function testCannotDeferLiquidityCheckForCreditAccount() public {
+        Example5 example = new Example5(ib);
+
         vm.prank(admin);
-        creditLimitManager.setCreditLimit(user1, address(market1), 100); // amount not important
+        creditLimitManager.setCreditLimit(address(example), address(market1), 100); // amount not important
 
-        assertTrue(ib.isCreditAccount(user1));
+        assertTrue(ib.isCreditAccount(address(example)));
 
-        Example1 example = new Example1(ib);
-
-        uint256 supplyAmount = 100e18;
-
-        vm.startPrank(user1);
-        ib.setUserExtension(address(example), true);
-
+        vm.prank(user1);
         vm.expectRevert("credit account cannot defer liquidity check");
-        example.execute(address(market1), supplyAmount);
-        vm.stopPrank();
+        example.execute(address(market1));
     }
 
     function testCannotDeferLiquidityCheckForReentry() public {
         Example4 example = new Example4(ib);
 
-        vm.prank(user1);
+        vm.startPrank(user1);
+        ib.setUserExtension(address(example), true);
+
         vm.expectRevert("reentry defer liquidity check");
         example.execute();
+        vm.stopPrank();
     }
 
     function testCannotDeferLiquidityCheckForInsufficientCollateral() public {
