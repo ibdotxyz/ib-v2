@@ -53,6 +53,10 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
             // Convert the price to USD based if it's ETH based.
             uint256 ethUsdPrice = getPriceFromChainlink(Denominations.ETH, Denominations.USD);
             price = (price * ethUsdPrice) / 1e18;
+        } else if (aggregatorInfo.quote == Denominations.BTC) {
+            // Convert the price to USD based if it's BTC based.
+            uint256 btcUsdPrice = getPriceFromChainlink(Denominations.BTC, Denominations.USD);
+            price = (price * btcUsdPrice) / 1e18;
         }
         return getNormalizedPrice(price, asset);
     }
@@ -98,7 +102,11 @@ contract PriceOracle is Ownable2Step, PriceOracleInterface {
         uint256 length = aggrs.length;
         for (uint256 i = 0; i < length;) {
             if (aggrs[i].base != address(0)) {
-                require(aggrs[i].quote == Denominations.ETH || aggrs[i].quote == Denominations.USD, "unsupported quote");
+                require(
+                    aggrs[i].quote == Denominations.ETH || aggrs[i].quote == Denominations.BTC
+                        || aggrs[i].quote == Denominations.USD,
+                    "unsupported quote"
+                );
 
                 // Make sure the aggregator works.
                 address aggregator = address(registry.getFeed(aggrs[i].base, aggrs[i].quote));

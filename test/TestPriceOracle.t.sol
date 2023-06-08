@@ -87,6 +87,19 @@ contract PriceOracleTest is Test, Common {
         assertEq(price, 1500e28); // 1500e18 * 1e18 / 1e8
     }
 
+    function testGetPrice4() public {
+        // Registry's decimals is 8.
+        int256 market2Price = 0.5e8;
+        int256 btcUsdPrice = 20000e8;
+
+        setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.BTC, market2Price);
+        setPriceToRegistry(registry, admin, Denominations.BTC, Denominations.USD, btcUsdPrice);
+
+        // The price from oracle is normalized by asset's decimals.
+        uint256 price = oracle.getPrice(address(market2));
+        assertEq(price, 10000e28); // 10000e18 * 1e18 / 1e8
+    }
+
     function testGetWstEthPrice() public {
         // Registry's decimals is 8.
         int256 market1Price = 1500e8;
@@ -149,7 +162,7 @@ contract PriceOracleTest is Test, Common {
         vm.expectRevert("unsupported quote");
         vm.prank(admin);
         PriceOracle.Aggregator[] memory aggrs = new PriceOracle.Aggregator[](1);
-        aggrs[0] = PriceOracle.Aggregator({asset: address(market1), base: address(market1), quote: Denominations.BTC});
+        aggrs[0] = PriceOracle.Aggregator({asset: address(market1), base: address(market1), quote: Denominations.GBP});
         oracle._setAggregators(aggrs);
     }
 
