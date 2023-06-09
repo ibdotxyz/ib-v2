@@ -102,7 +102,7 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
     }
 
     /// @inheritdoc DeferLiquidityCheckInterface
-    function onDeferredLiquidityCheck(bytes memory encodedData) external override {
+    function onDeferredLiquidityCheck(bytes memory encodedData) external payable override {
         require(msg.sender == address(ironBank), "untrusted message sender");
 
         (address initiator, Action[] memory actions, uint256 index) =
@@ -202,7 +202,7 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
      * @param data The encoded data
      */
     function deferLiquidityCheck(address user, bytes memory data) internal {
-        ironBank.deferLiquidityCheck(user, data);
+        ironBank.deferLiquidityCheck{value: msg.value}(user, data);
     }
 
     /**

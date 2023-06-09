@@ -514,6 +514,50 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
         extension.execute(actions);
     }
 
+    function testDeferLiquidityCheckWithSupplyEther() public {
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+        uint256 supplyAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](2);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        extension.execute{value: supplyAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, supplyAmount);
+        assertEq(user1EthBefore - user1EthAfter, supplyAmount);
+    }
+
+    function testDeferLiquidityCheckWithRepayEther() public {
+        prepareBorrow();
+
+        uint256 borrowAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        extension.execute(actions);
+
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+
+        uint256 repayAmount = 5e18;
+
+        vm.prank(user1);
+        actions = new TxBuilderExtension.Action[](2);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
+        extension.execute{value: repayAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, repayAmount);
+        assertEq(user1EthBefore - user1EthAfter, repayAmount);
+    }
+
     function testDeferLiquidityCheckWithPToken() public {
         uint256 supplyAmount = 10000e18;
         uint256 borrowAmount = 5000e6; // USDT

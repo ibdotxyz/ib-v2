@@ -16,7 +16,7 @@ contract Example1 is DeferLiquidityCheckInterface {
         ib.deferLiquidityCheck(msg.sender, abi.encode(msg.sender, supplyMarket, supplyAmount));
     }
 
-    function onDeferredLiquidityCheck(bytes memory data) external override {
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
         (address user, address supplyMarket, uint256 supplyAmount) = abi.decode(data, (address, address, uint256));
 
         // Supplying doesn't need to defer liquidity check. It's just for testing.
@@ -40,7 +40,7 @@ contract Example2 is DeferLiquidityCheckInterface {
         );
     }
 
-    function onDeferredLiquidityCheck(bytes memory data) external override {
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
         (address user, address borrowMarket, uint256 borrowAmount, address supplyMarket, uint256 supplyAmount) =
             abi.decode(data, (address, address, uint256, address, uint256));
 
@@ -66,7 +66,7 @@ contract Example3 is DeferLiquidityCheckInterface {
         );
     }
 
-    function onDeferredLiquidityCheck(bytes memory data) external override {
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
         (address user, address borrowMarket, uint256 borrowAmount, address supplyMarket, uint256 supplyAmount) =
             abi.decode(data, (address, address, uint256, address, uint256));
 
@@ -91,7 +91,7 @@ contract Example4 is DeferLiquidityCheckInterface {
         ib.deferLiquidityCheck(msg.sender, abi.encode(msg.sender));
     }
 
-    function onDeferredLiquidityCheck(bytes memory data) external override {
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
         (address user) = abi.decode(data, (address));
 
         // Re-enter to deferLiquidityCheck will revert.
@@ -111,11 +111,30 @@ contract Example5 is DeferLiquidityCheckInterface {
         ib.deferLiquidityCheck(address(this), abi.encode(market));
     }
 
-    function onDeferredLiquidityCheck(bytes memory data) external override {
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
         (address market) = abi.decode(data, (address));
 
         // Basically do nothing.
         ib.accrueInterest(market);
+    }
+}
+
+contract Example6 is DeferLiquidityCheckInterface {
+    IronBank ib;
+    uint256 msgValue;
+
+    constructor(IronBank _ib) {
+        ib = _ib;
+    }
+
+    function execute() external payable {
+        msgValue = msg.value;
+        ib.deferLiquidityCheck{value: msgValue}(address(this), "");
+    }
+
+    function onDeferredLiquidityCheck(bytes memory data) external payable override {
+        data; // Shh
+        require(msgValue == msg.value);
     }
 }
 
@@ -259,6 +278,16 @@ contract AccountLiquidityTest is Test, Common {
         vm.prank(user1);
         // Will not revert with "!authorized" since the example contract defers the liquidity check for itself.
         example.execute(address(market1));
+    }
+
+    function testDeferLiquidityCheck5() public {
+        uint256 amount = 1e18;
+        vm.deal(user1, amount);
+
+        Example6 example = new Example6(ib);
+
+        vm.prank(user1);
+        example.execute{value: amount}();
     }
 
     function testCannotDeferLiquidityCheckForNotAuthorized() public {
