@@ -300,6 +300,22 @@ contract AccountLiquidityTest is Test, Common {
         example.execute(address(market1), supplyAmount);
     }
 
+    function testCannotDeferLiquidityCheckForNotAuthorized2() public {
+        Example1 example = new Example1(ib);
+
+        uint256 supplyAmount = 100e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
+
+        vm.startPrank(user1);
+        ib.setUserExtension(address(example), true);
+
+        vm.expectRevert("!authorized");
+        example.execute(address(market1), supplyAmount); // credit account can't authorize operator
+        vm.stopPrank();
+    }
+
     function testCannotDeferLiquidityCheckForNotImplementingCallback() public {
         vm.prank(user1);
         vm.expectRevert(bytes(""));
