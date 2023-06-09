@@ -226,6 +226,20 @@ contract RepayTest is Test, Common {
         ib.repay(user1, user1, address(market1), repayAmount);
     }
 
+    function testCannotRepayForUnauthorized2() public {
+        uint256 repayAmount = 50e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
+
+        vm.prank(user1);
+        ib.setUserExtension(user2, true);
+
+        vm.prank(user2);
+        vm.expectRevert("!authorized");
+        ib.repay(user1, user1, address(market1), repayAmount); // credit account can't authorize operator
+    }
+
     function testCannotRepayForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 
