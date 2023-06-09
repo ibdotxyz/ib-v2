@@ -294,23 +294,6 @@ contract UniswapExtensionTest is Test, Common {
         extension.seize(user1, address(market1));
     }
 
-    function testSeizeNative() public {
-        vm.deal(address(extension), 100e18);
-
-        vm.prank(admin);
-        extension.seizeNative(user1);
-
-        assertEq(user1.balance, 100e18);
-    }
-
-    function testSeizeNativeForNotOwner() public {
-        vm.deal(address(extension), 100e18);
-
-        vm.prank(user1);
-        vm.expectRevert("Ownable: caller is not the owner");
-        extension.seizeNative(user1);
-    }
-
     function checkUniV3SwapExactOut(
         address swapOutAsset,
         uint256 swapOutAmount,

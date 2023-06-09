@@ -448,15 +448,6 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         IERC20(asset).safeTransfer(recipient, IERC20(asset).balanceOf(address(this)));
     }
 
-    /**
-     * @notice Admin seizes the native token from the contract.
-     * @param recipient The recipient of the seized native token
-     */
-    function seizeNative(address recipient) external onlyOwner {
-        (bool sent,) = recipient.call{value: address(this).balance}("");
-        require(sent, "failed to send native token");
-    }
-
     /* ========== INTERNAL FUNCTIONS ========== */
 
     /**
@@ -822,6 +813,4 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
     function getUniV2Pool(address tokenA, address tokenB) internal view returns (address pair) {
         pair = UniswapV2Utils.computeAddress(uniV2Factory, tokenA, tokenB);
     }
-
-    receive() external payable {}
 }
