@@ -483,6 +483,20 @@ contract LiquidateTest is Test, Common {
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
     }
 
+    function testCannotLiquidateForUnauthorized2() public {
+        uint256 repayAmount = 100e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user2, address(market1), 1); // amount not important
+
+        vm.prank(user2);
+        ib.setUserExtension(user1, true);
+
+        vm.prank(user1);
+        vm.expectRevert("!authorized");
+        ib.liquidate(user2, user1, address(market2), address(market1), repayAmount); // credit account can't authorize operator
+    }
+
     function testCannotLiquidateForBorrowMarketNotListed() public {
         ERC20 notListedMarket = new ERC20("Token", "TOKEN");
 
