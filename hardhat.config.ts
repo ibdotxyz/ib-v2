@@ -34,6 +34,7 @@ const config: HardhatUserConfig = {
       default: "0x47Fb2585D2C56Fe188D0E6ec628a38b74fCeeeDf",
     },
     weth: {
+      goerli: "0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6",
       default: "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
     },
     stETH: {
@@ -57,19 +58,18 @@ const config: HardhatUserConfig = {
     },
     mainnet: {
       url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
-      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY ?? ""}`],
+      accounts: process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`],
+    },
+    goerli: {
+      url: `https://goerli.infura.io/v3/${process.env.INFURA_TOKEN}`,
+      accounts: process.env.TESTNET_DEPLOY_KEY == undefined ? [] : [`0x${process.env.TESTNET_DEPLOY_KEY}`],
     },
     localhost: {
       url: "http://127.0.0.1:8545",
     },
   },
   etherscan: {
-    apiKey: {
-      mainnet: process.env.ETHERSCAN_API_KEY ?? "",
-      avalanche: process.env.SNOWSCAN_API_KEY ?? "",
-      opera: process.env.FTMSCAN_API_KEY ?? "",
-      optimisticEthereum: process.env.OPSCAN_API_KEY ?? "",
-    },
+    apiKey: process.env.ETHERSCAN_API_KEY ?? "",
   },
 };
 
