@@ -8,4 +8,6 @@ interface ComptrollerV1Interface {
     function checkMembership(address account, address cToken) external view returns (bool);
 
     function markets(address cToken) external view returns (bool, uint256, uint8);
+
+    function enterMarkets(address[] memory cTokens) external returns (uint256[] memory);
 }

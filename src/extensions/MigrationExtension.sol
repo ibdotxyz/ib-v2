@@ -59,7 +59,7 @@ contract MigrationExtension is Pausable, ReentrancyGuard, Ownable2Step, DeferLiq
         AdditionalSupply[] memory additionalSupply
     ) external payable nonReentrant whenNotPaused {
         bytes memory data = abi.encode(msg.sender, v1SupplyMarkets, v1BorrowMarkets, additionalSupply);
-        ironBank.deferLiquidityCheck(msg.sender, data);
+        ironBank.deferLiquidityCheck{value: msg.value}(msg.sender, data);
     }
 
     /// @inheritdoc DeferLiquidityCheckInterface
@@ -80,13 +80,15 @@ contract MigrationExtension is Pausable, ReentrancyGuard, Ownable2Step, DeferLiq
 
             address underlying = IBTokenV1Interface(ibTokenV1).underlying();
 
-            // Borrow from v2.
             uint256 borrowAmount = IBTokenV1Interface(ibTokenV1).borrowBalanceCurrent(initiator);
-            ironBank.borrow(initiator, address(this), underlying, borrowAmount);
+            if (borrowAmount > 0) {
+                // Borrow from v2.
+                ironBank.borrow(initiator, address(this), underlying, borrowAmount);
 
-            // Approve v1 and repay.
-            IERC20(underlying).safeIncreaseAllowance(ibTokenV1, borrowAmount);
-            IBTokenV1Interface(ibTokenV1).repayBorrowBehalf(initiator, borrowAmount);
+                // Approve v1 and repay.
+                IERC20(underlying).safeIncreaseAllowance(ibTokenV1, borrowAmount);
+                IBTokenV1Interface(ibTokenV1).repayBorrowBehalf(initiator, borrowAmount);
+            }
 
             unchecked {
                 i++;
@@ -100,15 +102,17 @@ contract MigrationExtension is Pausable, ReentrancyGuard, Ownable2Step, DeferLiq
 
             address underlying = IBTokenV1Interface(ibTokenV1).underlying();
 
-            // Transfer v1 token from initiator and redeem.
             uint256 redeemAmount = IERC20(ibTokenV1).balanceOf(initiator);
-            IERC20(ibTokenV1).transferFrom(initiator, address(this), redeemAmount);
-            IBTokenV1Interface(ibTokenV1).redeem(redeemAmount);
+            if (redeemAmount > 0) {
+                // Transfer v1 token from initiator and redeem.
+                IERC20(ibTokenV1).transferFrom(initiator, address(this), redeemAmount);
+                IBTokenV1Interface(ibTokenV1).redeem(redeemAmount);
 
-            // Approve v2 and supply.
-            uint256 balance = IERC20(underlying).balanceOf(address(this));
-            IERC20(underlying).safeIncreaseAllowance(address(ironBank), balance);
-            ironBank.supply(address(this), initiator, underlying, balance);
+                // Approve v2 and supply.
+                uint256 balance = IERC20(underlying).balanceOf(address(this));
+                IERC20(underlying).safeIncreaseAllowance(address(ironBank), balance);
+                ironBank.supply(address(this), initiator, underlying, balance);
+            }
 
             unchecked {
                 i++;
@@ -118,9 +122,10 @@ contract MigrationExtension is Pausable, ReentrancyGuard, Ownable2Step, DeferLiq
         // Supply additional collateral if provided.
         for (uint256 i = 0; i < additionalSupply.length;) {
             if (additionalSupply[i].market == ETH) {
-                WethInterface(weth).deposit{value: msg.value}();
-                IERC20(weth).safeIncreaseAllowance(address(ironBank), msg.value);
-                ironBank.supply(address(this), initiator, weth, msg.value);
+                uint256 supplyAmount = msg.value;
+                WethInterface(weth).deposit{value: supplyAmount}();
+                IERC20(weth).safeIncreaseAllowance(address(ironBank), supplyAmount);
+                ironBank.supply(address(this), initiator, weth, supplyAmount);
             } else {
                 ironBank.supply(initiator, initiator, additionalSupply[i].market, additionalSupply[i].amount);
             }
