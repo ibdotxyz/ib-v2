@@ -42,20 +42,27 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
     parseUnits("100000", 6)
   );
 
-  await execute("StETH", { from: admin, log: true }, "transfer", user1, parseEther("100"));
   await execute("USDC", { from: admin, log: true }, "transfer", user2, parseUnits("500000", 6));
-  await execute("USDC", { from: admin, log: true }, "transfer", user1, parseUnits("10000", 6));
   await execute("USDC", { from: user2, log: true }, "approve", ironBankAddress, parseUnits("500000", 6));
   await execute("IronBank", { from: user2, log: true }, "supply", user2, user2, usdcAddress, parseUnits("500000", 6));
+
+  await execute("StETH", { from: admin, log: true }, "transfer", user1, parseEther("100"));
+  await execute("WBTC", { from: admin, log: true }, "transfer", user1, parseUnits("1.57", 8));
+  await execute("USDT", { from: admin, log: true }, "transfer", user1, parseUnits("48800", 6));
+  await execute("USDC", { from: admin, log: true }, "transfer", user1, parseUnits("10000", 6));
+  await execute("WETH", { from: user1, value: parseEther("0.87"), log: true }, "deposit");
 
   await execute("IronBank", { from: user1, log: true }, "setUserExtension", txBuilderExtAddress, true);
   await execute("TxBuilderExtension", { from: user1, log: true, value: parseEther("10") }, "execute", [
     [formatBytes32String("ACTION_SUPPLY_NATIVE_TOKEN"), "0x"],
     [
       formatBytes32String("ACTION_BORROW"),
-      defaultAbiCoder.encode(["address", "uint256"], [usdcAddress, parseUnits("15571", 6)]),
+      defaultAbiCoder.encode(["address", "uint256"], [usdcAddress, parseUnits("8551", 6)]),
     ],
   ]);
+
+  await network.provider.send("evm_setAutomine", [false]);
+  await network.provider.send("evm_setIntervalMining", [3000]);
 };
 
 deployFn.dependencies = ["ListMarkets"];

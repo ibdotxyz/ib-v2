@@ -159,7 +159,7 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   }
 };
 
-deployFn.tags = ["ListMarkets", "deploy"];
+deployFn.tags = ["ListMarkets"];
 deployFn.dependencies = [
   "IronBank",
   "PriceOracle",
