@@ -581,8 +581,6 @@ contract IronBank is
      */
     function listMarket(address market, DataTypes.MarketConfig calldata config) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
-        require(!m.config.isListed, "already listed");
-
         m.lastUpdateTimestamp = _getNow();
         m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
@@ -598,9 +596,10 @@ contract IronBank is
      */
     function delistMarket(address market) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        delete markets[market];
+        // The nested mapping like userBorrows can't be deleted completely, so we just set `isListed` to false.
+        m.config.isListed = false;
+        // `isDelisted` is needed to distinguish delisted markets from markets that have never been listed before.
+        m.config.isDelisted = true;
         allMarkets.deleteElement(market);
 
         emit MarketDelisted(market);
@@ -617,8 +616,6 @@ contract IronBank is
         onlyMarketConfigurator
     {
         DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
         m.config = config;
 
         emit MarketConfigurationChanged(market, config);
