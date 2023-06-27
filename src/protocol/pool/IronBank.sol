@@ -417,11 +417,9 @@ contract IronBank is
         uint256 totalCash = m.totalCash;
 
         uint256 ibTokenAmount;
-        bool isRedeemFull;
         if (amount == type(uint256).max) {
             ibTokenAmount = userSupply;
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
-            isRedeemFull = true;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
         }
@@ -429,16 +427,21 @@ contract IronBank is
         require(userSupply >= ibTokenAmount, "insufficient balance");
         require(totalCash >= amount, "insufficient cash");
 
-        // Update storage.
+        uint256 newUserSupply;
         unchecked {
-            m.userSupplies[from] = userSupply - ibTokenAmount;
+            newUserSupply = userSupply - ibTokenAmount;
+        }
+
+        // Update storage.
+        m.userSupplies[from] = newUserSupply;
+        unchecked {
             m.totalCash = totalCash - amount;
             // Underflow not possible: ibTokenAmount <= userSupply <= totalSupply.
             m.totalSupply -= ibTokenAmount;
         }
 
         // Check if need to exit the market.
-        if (isRedeemFull && _getBorrowBalance(m, from) == 0) {
+        if (newUserSupply == 0 && _getBorrowBalance(m, from) == 0) {
             _exitMarket(market, from);
         }
 
