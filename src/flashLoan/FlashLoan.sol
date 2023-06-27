@@ -7,9 +7,11 @@ import "openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IERC3156FlashLender.sol";
 import "../interfaces/DeferLiquidityCheckInterface.sol";
 import "../interfaces/IronBankInterface.sol";
+import "../libraries/PauseFlags.sol";
 
 contract FlashLoan is IERC3156FlashLender, DeferLiquidityCheckInterface {
     using SafeERC20 for IERC20;
+    using PauseFlags for DataTypes.MarketConfig;
 
     /// @notice The standard signature for ERC-3156 borrower
     bytes32 public constant CALLBACK_SUCCESS = keccak256("ERC3156FlashBorrower.onFlashLoan");
@@ -31,6 +33,10 @@ contract FlashLoan is IERC3156FlashLender, DeferLiquidityCheckInterface {
         }
 
         DataTypes.MarketConfig memory config = IronBankInterface(ironBank).getMarketConfiguration(token);
+        if (config.isBorrowPaused()) {
+            return 0;
+        }
+
         uint256 totalCash = IronBankInterface(ironBank).getTotalCash(token);
         uint256 totalBorrow = IronBankInterface(ironBank).getTotalBorrow(token);
 
@@ -50,6 +56,9 @@ contract FlashLoan is IERC3156FlashLender, DeferLiquidityCheckInterface {
         amount;
 
         require(IronBankInterface(ironBank).isMarketListed(token), "token not listed");
+
+        DataTypes.MarketConfig memory config = IronBankInterface(ironBank).getMarketConfiguration(token);
+        require(!config.isBorrowPaused(), "borrow is paused");
 
         return 0;
     }
