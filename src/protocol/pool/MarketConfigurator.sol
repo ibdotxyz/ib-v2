@@ -188,7 +188,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
         require(config.isListed, "not listed");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
-        // Accrue interests before changing IRM.
+        // Accrue interests before changing reserve factor.
         ironBank.accrueInterest(market);
 
         config.reserveFactor = reserveFactor;
@@ -292,6 +292,9 @@ contract MarketConfigurator is Ownable2Step, Constants {
             emit MarketPausedSet(market, "borrow", true);
         }
         if (config.reserveFactor != MAX_RESERVE_FACTOR) {
+            // Accrue interests before changing reserve factor.
+            ironBank.accrueInterest(market);
+
             config.reserveFactor = MAX_RESERVE_FACTOR;
             emit MarketReserveFactorSet(market, MAX_RESERVE_FACTOR);
         }
