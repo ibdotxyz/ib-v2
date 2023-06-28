@@ -492,7 +492,7 @@ contract IronBank is
         require(mBorrow.config.isListed, "borrow market not listed");
         require(mCollateral.config.isListed, "collateral market not listed");
         require(isMarketSeizable(mCollateral), "collateral market cannot be seized");
-        require(!isCreditAccount(borrower), "cannot liquidate credit account");
+        require(!isCreditAccount(liquidator) && !isCreditAccount(borrower), "cannot liquidate credit account");
         require(liquidator != borrower, "cannot self liquidate");
 
         _accrueInterest(marketBorrow, mBorrow);
