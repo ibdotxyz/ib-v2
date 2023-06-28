@@ -82,7 +82,6 @@ contract UniswapExtensionIntegrationTest is Test, Common {
         setPriceForMarket(oracle, admin, WETH, Denominations.ETH, Denominations.USD);
         setPriceForMarket(oracle, admin, DAI, DAI, Denominations.USD);
         setPriceForMarket(oracle, admin, USDT, USDT, Denominations.USD);
-        setPriceForMarket(oracle, admin, address(pDAI), DAI, Denominations.USD);
 
         // Set collateral factors.
         configureMarketAsCollateral(admin, configurator, WETH, wethCollateralFactor);
