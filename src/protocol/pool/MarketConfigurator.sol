@@ -40,7 +40,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     event MarketBorrowCapSet(address market, uint256 cap);
     event MarketPausedSet(address market, string action, bool paused);
     event MarketFrozen(address market, bool state);
-    event MarketPTokenSet(address market, address pToken);
+    event MarketConfiguredAsPToken(address market);
 
     constructor(address ironBank_) {
         ironBank = IronBankInterface(ironBank_);
@@ -312,18 +312,6 @@ contract MarketConfigurator is Ownable2Step, Constants {
             "collateral factor or liquidation threshold not zero"
         );
 
-        if (config.isPToken) {
-            address underlying = PTokenInterface(market).getUnderlying();
-            DataTypes.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
-            // It's possible that the underlying is not listed.
-            if (underlyingConfig.isListed && underlyingConfig.pTokenAddress != address(0)) {
-                underlyingConfig.pTokenAddress = address(0);
-                ironBank.setMarketConfiguration(underlying, underlyingConfig);
-
-                emit MarketPTokenSet(underlying, address(0));
-            }
-        }
-
         ironBank.delistMarket(market);
 
         emit MarketDelisted(market);
@@ -428,23 +416,26 @@ contract MarketConfigurator is Ownable2Step, Constants {
     }
 
     /**
-     * @notice Set the pToken of a market.
-     * @dev This function needs to be called when the market's pToken was listed first.
-     * @param market The market to be set
-     * @param pToken The pToken of the market
+     * @notice Configure a market as a pToken.
+     * @dev This function can be called when the pToken was accidentally listed by using `listMarket` function.
+     * @param market The market to be configured as a pToken
      */
-    function setMarketPToken(address market, address pToken) external onlyOwnerOrGuardian {
-        require(PTokenInterface(pToken).getUnderlying() == market, "mismatch pToken");
-        require(ironBank.isMarketListed(pToken), "pToken not listed");
+    function configureMarketAsPToken(address market) external onlyOwnerOrGuardian {
+        // Simple sanity check to make sure the market is a pToken.
+        PTokenInterface(market).getUnderlying();
 
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(config.isListed, "not listed");
-        require(config.pTokenAddress == address(0), "pToken already set");
+        require(!config.isPToken, "already a pToken");
 
-        config.pTokenAddress = pToken;
+        config.isPToken = true;
+        config.setBorrowPaused(true);
+        // Set the borrow cap to a very small amount (1 Wei) to prevent borrowing.
+        config.borrowCap = 1;
+
         ironBank.setMarketConfiguration(market, config);
 
-        emit MarketPTokenSet(market, pToken);
+        emit MarketConfiguredAsPToken(market);
     }
 
     /* ========== INTERNAL FUNCTIONS ========== */
@@ -476,26 +467,13 @@ contract MarketConfigurator is Ownable2Step, Constants {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
         require(IBTokenInterface(ibTokenAddress).asset() == market, "mismatch market");
+        if (!isPToken) {
+            require(DebtTokenInterface(debtTokenAddress).asset() == market, "mismatch market");
+        }
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
         uint8 underlyingDecimals = IERC20Metadata(market).decimals();
         require(underlyingDecimals <= 18, "nonstandard token decimals");
-
-        if (isPToken) {
-            address underlying = PTokenInterface(market).getUnderlying();
-            DataTypes.MarketConfig memory underlyingConfig = getMarketConfiguration(underlying);
-            // It's possible that the underlying is not listed.
-            if (underlyingConfig.isListed) {
-                require(underlyingConfig.pTokenAddress == address(0), "underlying already has pToken");
-
-                underlyingConfig.pTokenAddress = market;
-                ironBank.setMarketConfiguration(underlying, underlyingConfig);
-
-                emit MarketPTokenSet(underlying, market);
-            }
-        } else {
-            require(DebtTokenInterface(debtTokenAddress).asset() == market, "mismatch market");
-        }
 
         config.isListed = true;
         config.ibTokenAddress = ibTokenAddress;

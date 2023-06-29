@@ -31,7 +31,6 @@ contract IronBankLens is Constants {
         bool isSoftDelisted;
         address ibTokenAddress;
         address debtTokenAddress;
-        address pTokenAddress;
         address interestRateModelAddress;
         uint256 supplyCap;
         uint256 borrowCap;
@@ -262,7 +261,6 @@ contract IronBankLens is Constants {
             isSoftDelisted: isSoftDelisted,
             ibTokenAddress: config.ibTokenAddress,
             debtTokenAddress: config.debtTokenAddress,
-            pTokenAddress: config.pTokenAddress,
             interestRateModelAddress: config.interestRateModelAddress,
             supplyCap: config.supplyCap,
             borrowCap: config.borrowCap
