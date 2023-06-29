@@ -6,6 +6,7 @@ import "openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 import "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
+import "../../interfaces/PTokenInterface.sol";
 import "../../libraries/DataTypes.sol";
 import "../../libraries/PauseFlags.sol";
 import "../pool/IronBank.sol";
@@ -298,7 +299,9 @@ contract IronBankLens is Constants {
         }
 
         uint256 maxBorrowAmount;
-        if (config.borrowCap == 0) {
+        if (config.isPToken) {
+            maxBorrowAmount = 0;
+        } else if (config.borrowCap == 0) {
             maxBorrowAmount = totalCash;
         } else if (config.borrowCap > totalBorrow) {
             uint256 gap = config.borrowCap - totalBorrow;
@@ -313,10 +316,28 @@ contract IronBankLens is Constants {
             totalReserves: totalReserves,
             maxSupplyAmount: maxSupplyAmount,
             maxBorrowAmount: maxBorrowAmount,
-            marketPrice: oracle.getPrice(market),
+            marketPrice: getMarketPrice(config.isPToken, market, oracle),
             exchangeRate: ironBank.getExchangeRate(market),
             supplyRate: irm.getSupplyRate(totalCash, totalBorrow),
             borrowRate: irm.getBorrowRate(totalCash, totalBorrow)
         });
+    }
+
+    /**
+     * @dev Get the market price for a given market.
+     * @param isPToken Whether the market is a pToken
+     * @param market The market to get price for
+     * @param oracle The price oracle contract
+     * @return The market price
+     */
+    function getMarketPrice(bool isPToken, address market, PriceOracleInterface oracle)
+        internal
+        view
+        returns (uint256)
+    {
+        if (isPToken) {
+            market = PTokenInterface(market).getUnderlying();
+        }
+        return oracle.getPrice(market);
     }
 }

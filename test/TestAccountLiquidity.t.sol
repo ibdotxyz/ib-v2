@@ -22,6 +22,7 @@ contract AccountLiquidityTest is Test, Common {
 
     ERC20Market market1;
     ERC20Market market2;
+    PToken pToken1;
     IBToken ibToken1;
     IBToken ibToken2;
 
@@ -48,8 +49,16 @@ contract AccountLiquidityTest is Test, Common {
         (market2, ibToken2,) =
             createAndListERC20Market(underlyingDecimals2, admin, ib, configurator, irm, reserveFactor);
 
+        // List pToken.
+        pToken1 = createPToken(admin, address(market1));
+        IBToken ibToken = createIBToken(admin, address(ib), address(pToken1));
+
+        vm.prank(admin);
+        configurator.listPTokenMarket(address(pToken1), address(ibToken), address(irm), reserveFactor);
+
         configureMarketAsCollateral(admin, configurator, address(market1), collateralFactor);
         configureMarketAsCollateral(admin, configurator, address(market2), collateralFactor);
+        configureMarketAsCollateral(admin, configurator, address(pToken1), collateralFactor);
 
         registry = createRegistry();
         oracle = createPriceOracle(admin, address(registry));
@@ -61,8 +70,13 @@ contract AccountLiquidityTest is Test, Common {
         setPriceForMarket(oracle, registry, admin, address(market2), address(market2), Denominations.ETH, market2Price);
         setPriceToRegistry(registry, admin, Denominations.ETH, Denominations.USD, ethUsdPrice);
 
-        deal(address(market1), user, 10_000 * (10 ** underlyingDecimals1));
+        deal(address(market1), user, 20_000 * (10 ** underlyingDecimals1));
         deal(address(market2), user, 10_000 * (10 ** underlyingDecimals2));
+
+        vm.startPrank(user);
+        market1.approve(address(pToken1), 10_000 * (10 ** underlyingDecimals1));
+        pToken1.wrap(10_000 * (10 ** underlyingDecimals1));
+        vm.stopPrank();
     }
 
     function testGetAccountLiquidity() public {
@@ -74,35 +88,37 @@ contract AccountLiquidityTest is Test, Common {
         ib.supply(user, user, address(market1), market1SupplyAmount);
         market2.approve(address(ib), market2SupplyAmount);
         ib.supply(user, user, address(market2), market2SupplyAmount);
+        pToken1.approve(address(ib), market1SupplyAmount);
+        ib.supply(user, user, address(pToken1), market1SupplyAmount);
 
         /**
-         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) = 2,400,000
+         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) + 1000 * 0.8 * 1500 = 3,600,000
          * debt value = 0
          */
         (uint256 collateralValue, uint256 debtValue) = ib.getAccountLiquidity(user);
-        assertEq(collateralValue, 2400000e18);
+        assertEq(collateralValue, 3600000e18);
         assertEq(debtValue, 0);
 
         uint256 market1BorrowAmount = 1000 * (10 ** underlyingDecimals1);
         ib.borrow(user, user, address(market1), market1BorrowAmount);
 
         /**
-         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) = 2,400,000
+         * collateral value = 1000 * 0.8 * 1500 + 1000 * 0.8 * (0.5 * 3000) + 1000 * 0.8 * 1500 = 3,600,000
          * debt value = 1000 * 1500 = 1,500,000
          */
         (collateralValue, debtValue) = ib.getAccountLiquidity(user);
-        assertEq(collateralValue, 2400000e18);
+        assertEq(collateralValue, 3600000e18);
         assertEq(debtValue, 1500000e18);
 
         uint256 market2RedeemAmount = 500 * (10 ** underlyingDecimals2);
         ib.redeem(user, user, address(market2), market2RedeemAmount);
 
         /**
-         * collateral value = 1000 * 0.8 * 1500 + 500 * 0.8 * (0.5 * 3000) = 1,800,000
+         * collateral value = 1000 * 0.8 * 1500 + 500 * 0.8 * (0.5 * 3000) + 1000 * 0.8 * 1500 = 3,000,000
          * debt value = 1000 * 1500 = 1,500,000
          */
         (collateralValue, debtValue) = ib.getAccountLiquidity(user);
-        assertEq(collateralValue, 1800000e18);
+        assertEq(collateralValue, 3000000e18);
         assertEq(debtValue, 1500000e18);
         vm.stopPrank();
     }

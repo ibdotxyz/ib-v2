@@ -14,6 +14,7 @@ import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
+import "../../interfaces/PTokenInterface.sol";
 import "../../libraries/Arrays.sol";
 import "../../libraries/DataTypes.sol";
 import "../../libraries/PauseFlags.sol";
@@ -271,8 +272,9 @@ contract IronBank is
         returns (uint256)
     {
         DataTypes.Market storage mCollateral = markets[marketCollateral];
+        DataTypes.Market storage mBorrow = markets[marketCollateral];
 
-        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mBorrow, mCollateral, repayAmount);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -505,7 +507,8 @@ contract IronBank is
         repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
         // Seize the collateral.
-        uint256 ibTokenAmount = _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        uint256 ibTokenAmount =
+            _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mBorrow, mCollateral, repayAmount);
         _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount); // Only emits Transfer event.
 
@@ -814,6 +817,7 @@ contract IronBank is
      * @dev Get the amount of ibToken that can be seized in a liquidation.
      * @param marketBorrow The address of the market being borrowed from
      * @param marketCollateral The address of the market being used as collateral
+     * @param mBorrow The storage of the borrow market
      * @param mCollateral The storage of the collateral market
      * @param repayAmount The amount of the borrowed asset being repaid
      * @return The amount of ibToken that can be seized
@@ -821,12 +825,12 @@ contract IronBank is
     function _getLiquidationSeizeAmount(
         address marketBorrow,
         address marketCollateral,
+        DataTypes.Market storage mBorrow,
         DataTypes.Market storage mCollateral,
         uint256 repayAmount
     ) internal view returns (uint256) {
-        uint256 borrowMarketPrice = PriceOracleInterface(priceOracle).getPrice(marketBorrow);
-        uint256 collateralMarketPrice = PriceOracleInterface(priceOracle).getPrice(marketCollateral);
-        require(borrowMarketPrice > 0 && collateralMarketPrice > 0, "invalid price");
+        uint256 borrowMarketPrice = getMarketPrice(mBorrow, marketBorrow);
+        uint256 collateralMarketPrice = getMarketPrice(mCollateral, marketCollateral);
 
         // collateral amount = repayAmount * liquidationBonus * borrowMarketPrice / collateralMarketPrice
         // IBToken amount = collateral amount / exchangeRate
@@ -1043,8 +1047,7 @@ contract IronBank is
             uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
-            uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
-            require(assetPrice > 0, "invalid price");
+            uint256 assetPrice = getMarketPrice(m, userEnteredMarkets[i]);
             uint256 collateralFactor = m.config.collateralFactor;
             if (supplyBalance > 0 && collateralFactor > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
@@ -1076,8 +1079,7 @@ contract IronBank is
             uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
-            uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
-            require(assetPrice > 0, "invalid price");
+            uint256 assetPrice = getMarketPrice(m, userEnteredMarkets[i]);
             uint256 liquidationThreshold = m.config.liquidationThreshold;
             if (supplyBalance > 0 && liquidationThreshold > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
@@ -1098,5 +1100,18 @@ contract IronBank is
      */
     function isMarketSeizable(DataTypes.Market storage m) internal view returns (bool) {
         return !m.config.isTransferPaused() && m.config.liquidationThreshold > 0;
+    }
+
+    /**
+     * @dev Get the market price from the price oracle. If the market is a pToken, use its underlying to get the price.
+     * @param m The market object
+     * @param market The address of the market
+     * @return The market price
+     */
+    function getMarketPrice(DataTypes.Market storage m, address market) internal view returns (uint256) {
+        address asset = m.config.isPToken ? PTokenInterface(market).getUnderlying() : market;
+        uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(asset);
+        require(assetPrice > 0, "invalid price");
+        return assetPrice;
     }
 }
