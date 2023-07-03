@@ -323,6 +323,7 @@ contract IronBank is
         }
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
+        require(ibTokenAmount > 0, "zero ibToken amount");
 
         // Update storage.
         m.totalCash += amount;
@@ -426,6 +427,7 @@ contract IronBank is
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
         }
 
+        require(ibTokenAmount > 0, "zero ibToken amount");
         require(userSupply >= ibTokenAmount, "insufficient balance");
         require(totalCash >= amount, "insufficient cash");
 
