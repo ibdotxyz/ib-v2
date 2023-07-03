@@ -260,4 +260,27 @@ contract RedeemTest is Test, Common {
         vm.expectRevert("insufficient collateral");
         ib.redeem(user1, user1, address(market1), redeemAmount);
     }
+
+    function testCannotRedeemForZeroAmount() public {
+        uint256 supplyAmount = 100e18;
+
+        vm.startPrank(user1);
+        market1.approve(address(ib), supplyAmount);
+        ib.supply(user1, user1, address(market1), supplyAmount);
+        vm.stopPrank();
+
+        vm.startPrank(admin);
+        market2.approve(address(ib), 10000e18);
+        ib.supply(admin, admin, address(market2), 10000e18);
+        ib.borrow(admin, admin, address(market1), 30e18);
+        vm.stopPrank();
+
+        fastForwardTime(86400);
+
+        uint256 redeemAmount = 1; // 1 wei
+
+        vm.prank(user2);
+        vm.expectRevert("zero ibToken amount");
+        ib.redeem(user2, user2, address(market1), redeemAmount);
+    }
 }

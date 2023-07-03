@@ -216,11 +216,6 @@ contract EnterExitMarketTest is Test, Common {
 
         user1EnteredMarkets = ib.getUserEnteredMarkets(user1);
         assertEq(user1EnteredMarkets.length, 0);
-
-        ib.redeem(user1, user1, address(market1), 0); // nothing happens
-
-        user1EnteredMarkets = ib.getUserEnteredMarkets(user1);
-        assertEq(user1EnteredMarkets.length, 0);
         vm.stopPrank();
     }
 
