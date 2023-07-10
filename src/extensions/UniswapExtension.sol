@@ -109,6 +109,11 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
     /// @notice The address of Lido wrapped staked ETH
     address public immutable wsteth;
 
+    /// @notice The event of a swap being executed
+    event SwapExecuted(
+        address user, bytes32 subAction, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut
+    );
+
     /**
      * @notice Modifier to check if the deadline has passed
      * @param deadline The deadline to check
@@ -551,6 +556,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountIn = uniV3AmountInCached;
         require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
         uniV3AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, amountIn, swapOutAmount);
     }
 
     /**
@@ -610,6 +617,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountOut = uniV3AmountOutCached;
         require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
         uniV3AmountOutCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, swapInAmount, amountOut);
     }
 
     /**
@@ -660,6 +669,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountIn = uniV2AmountInCached;
         require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
         uniV2AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, amountIn, swapOutAmount);
     }
 
     /**
@@ -710,6 +721,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountOut = uniV2AmountOutCached;
         require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
         uniV2AmountOutCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, swapInAmount, amountOut);
     }
 
     /**
