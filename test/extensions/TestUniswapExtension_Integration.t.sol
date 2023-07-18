@@ -129,8 +129,25 @@ contract UniswapExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
-        actions[0] = UniswapExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = UniswapExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
         extension.execute{value: supplyAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, supplyAmount);
+        assertEq(user1EthBefore - user1EthAfter, supplyAmount);
+    }
+
+    function testRefundUnusedEther() public {
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+        uint256 nativeTokenAmount = 15e18;
+        uint256 supplyAmount = 10e18;
+
+        vm.prank(user1);
+        UniswapExtension.Action[] memory actions = new UniswapExtension.Action[](1);
+        actions[0] = UniswapExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        extension.execute{value: nativeTokenAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
         uint256 user1EthAfter = user1.balance;
