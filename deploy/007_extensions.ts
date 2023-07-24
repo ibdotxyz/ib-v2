@@ -10,7 +10,7 @@ const deployFn: DeployFunction = async (hre) => {
 
   var wethAddress, stETHAddress, wstETHAddress;
   const network = hre.network as any;
-  if (network.config.forking || network.name == "mainnet") {
+  if (network.config.forking || network.name == "mainnet" || network.name == "goerli") {
     const { weth, stETH, wstETH, uniswapV3Factory, uniswapV2Factory } = await getNamedAccounts();
     wethAddress = weth;
     stETHAddress = stETH;
@@ -52,5 +52,4 @@ const deployFn: DeployFunction = async (hre) => {
 };
 
 deployFn.tags = ["Extension", "deploy"];
-deployFn.dependencies = ["IronBank", "PriceOracle", "InterestRateModel", "MarketConfigurator"];
 export default deployFn;
