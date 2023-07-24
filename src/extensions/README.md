@@ -192,7 +192,10 @@ Help user wrap Ether into WETH and supply it into Iron Bank.
 
 Action name: `ACTION_SUPPLY_NATIVE_TOKEN`
 
-Action data: None, but `msg.value` should be the supply amount.
+Action data:
+| Type | Description |
+|------|-------------|
+| uint256 | the supply amount |
 
 ### Supply
 

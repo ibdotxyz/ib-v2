@@ -109,6 +109,11 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
     /// @notice The address of Lido wrapped staked ETH
     address public immutable wsteth;
 
+    /// @notice The event of a swap being executed
+    event SwapExecuted(
+        address user, bytes32 subAction, address tokenIn, address tokenOut, uint256 amountIn, uint256 amountOut
+    );
+
     /**
      * @notice Modifier to check if the deadline has passed
      * @param deadline The deadline to check
@@ -448,15 +453,6 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         IERC20(asset).safeTransfer(recipient, IERC20(asset).balanceOf(address(this)));
     }
 
-    /**
-     * @notice Admin seizes the native token from the contract.
-     * @param recipient The recipient of the seized native token
-     */
-    function seizeNative(address recipient) external onlyOwner {
-        (bool sent,) = recipient.call{value: address(this).balance}("");
-        require(sent, "failed to send native token");
-    }
-
     /* ========== INTERNAL FUNCTIONS ========== */
 
     /**
@@ -560,6 +556,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountIn = uniV3AmountInCached;
         require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
         uniV3AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, amountIn, swapOutAmount);
     }
 
     /**
@@ -619,6 +617,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountOut = uniV3AmountOutCached;
         require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
         uniV3AmountOutCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, swapInAmount, amountOut);
     }
 
     /**
@@ -669,6 +669,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountIn = uniV2AmountInCached;
         require(amountIn <= maxSwapInAmount, "swap in amount exceeds max swap in amount");
         uniV2AmountInCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, amountIn, swapOutAmount);
     }
 
     /**
@@ -719,6 +721,8 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
         uint256 amountOut = uniV2AmountOutCached;
         require(amountOut >= minSwapOutAmount, "swap out amount is less than min swap out amount");
         uniV2AmountOutCached = DEFAULT_AMOUNT_CACHED;
+
+        emit SwapExecuted(msg.sender, subAction, swapInAsset, swapOutAsset, swapInAmount, amountOut);
     }
 
     /**
@@ -822,6 +826,4 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
     function getUniV2Pool(address tokenA, address tokenB) internal view returns (address pair) {
         pair = UniswapV2Utils.computeAddress(uniV2Factory, tokenA, tokenB);
     }
-
-    receive() external payable {}
 }
