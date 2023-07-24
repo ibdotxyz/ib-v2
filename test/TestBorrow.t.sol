@@ -261,6 +261,20 @@ contract BorrowTest is Test, Common {
         ib.borrow(user2, user2, address(market2), borrowAmount);
     }
 
+    function testCannotBorrowForUnauthorized2() public {
+        uint256 borrowAmount = 500e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user2, address(market1), 1); // amount not important
+
+        vm.prank(user2);
+        ib.setUserExtension(user1, true);
+
+        vm.prank(user1);
+        vm.expectRevert("!authorized");
+        ib.borrow(user2, user2, address(market2), borrowAmount); // credit account can't authorize operator
+    }
+
     function testCannotBorrowForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 

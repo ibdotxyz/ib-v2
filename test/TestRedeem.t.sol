@@ -195,6 +195,20 @@ contract RedeemTest is Test, Common {
         ib.redeem(user2, user2, address(market1), redeemAmount);
     }
 
+    function testCannotRedeemForUnauthorized2() public {
+        uint256 redeemAmount = 50e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user2, address(market1), 1); // amount not important
+
+        vm.prank(user2);
+        ib.setUserExtension(user1, true);
+
+        vm.prank(user1);
+        vm.expectRevert("!authorized");
+        ib.redeem(user2, user2, address(market1), redeemAmount); // credit account can't authorize operator
+    }
+
     function testCannotRedeemForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 

@@ -172,6 +172,20 @@ contract SupplyTest is Test, Common {
         ib.supply(user1, user1, address(market1), supplyAmount);
     }
 
+    function testCannotSupplyForUnauthorized2() public {
+        uint256 supplyAmount = 100e18;
+
+        vm.prank(admin);
+        creditLimitManager.setCreditLimit(user1, address(market1), 1); // amount not important
+
+        vm.prank(user1);
+        ib.setUserExtension(user2, true);
+
+        vm.prank(user2);
+        vm.expectRevert("!authorized");
+        ib.supply(user1, user1, address(market1), supplyAmount); // credit account can't authorize operator
+    }
+
     function testCannotSupplyForMarketNotListed() public {
         ERC20 invalidMarket = new ERC20("Token", "TOKEN");
 
