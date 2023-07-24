@@ -100,7 +100,6 @@ contract IronBankLensTest is Test, Common {
         assertFalse(metadata.isSoftDelisted);
         assertEq(metadata.ibTokenAddress, address(ibToken1));
         assertEq(metadata.debtTokenAddress, address(debtToken1));
-        assertEq(metadata.pTokenAddress, address(0));
         assertEq(metadata.interestRateModelAddress, address(irm));
         assertEq(metadata.supplyCap, 0);
         assertEq(metadata.borrowCap, 0);
@@ -126,7 +125,6 @@ contract IronBankLensTest is Test, Common {
         assertFalse(metadatas[0].isSoftDelisted);
         assertEq(metadatas[0].ibTokenAddress, address(ibToken1));
         assertEq(metadatas[0].debtTokenAddress, address(debtToken1));
-        assertEq(metadatas[0].pTokenAddress, address(0));
         assertEq(metadatas[0].interestRateModelAddress, address(irm));
         assertEq(metadatas[0].supplyCap, 0);
         assertEq(metadatas[0].borrowCap, 0);
@@ -146,7 +144,6 @@ contract IronBankLensTest is Test, Common {
         assertFalse(metadatas[1].isSoftDelisted);
         assertEq(metadatas[1].ibTokenAddress, address(ibToken2));
         assertEq(metadatas[1].debtTokenAddress, address(debtToken2));
-        assertEq(metadatas[1].pTokenAddress, address(0));
         assertEq(metadatas[1].interestRateModelAddress, address(irm));
         assertEq(metadatas[1].supplyCap, 0);
         assertEq(metadatas[1].borrowCap, 0);

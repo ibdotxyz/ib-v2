@@ -724,92 +724,67 @@ contract MarketConfiguratorTest is Test, Common {
         vm.stopPrank();
     }
 
-    function testSetMarketPToken() public {
+    function testConfigureMarketAsPToken() public {
         uint16 reserveFactor = 1000; // 10%
 
-        ERC20 market2 = new ERC20("Token", "TOKEN");
-        IBToken ibToken1 = createIBToken(admin, address(ib), address(market2));
-        DebtToken debtToken1 = createDebtToken(admin, address(ib), address(market2));
+        PToken pToken = createPToken(admin, address(market));
+        IBToken ibToken = createIBToken(admin, address(ib), address(pToken));
+        DebtToken debtToken = createDebtToken(admin, address(ib), address(pToken));
 
-        PToken pToken = createPToken(admin, address(market2));
-        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
+        vm.prank(admin);
+        configurator.listMarket(address(pToken), address(ibToken), address(debtToken), address(irm), reserveFactor);
 
-        // List the pToken first.
-        vm.startPrank(admin);
-        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
+        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(pToken));
+        assertTrue(config.isListed);
+        assertEq(config.ibTokenAddress, address(ibToken));
+        assertEq(config.debtTokenAddress, address(debtToken));
+        assertEq(config.interestRateModelAddress, address(irm));
+        assertEq(config.reserveFactor, reserveFactor);
+        assertFalse(config.isPToken);
 
-        // List the underlying of the pToken.
-        configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
+        vm.prank(admin);
+        configurator.configureMarketAsPToken(address(pToken));
 
-        configurator.setMarketPToken(address(market2), address(pToken));
-        vm.stopPrank();
-
-        DataTypes.MarketConfig memory config = ib.getMarketConfiguration(address(market2));
-        assertEq(config.pTokenAddress, address(pToken));
+        config = ib.getMarketConfiguration(address(pToken));
+        assertTrue(config.isListed);
+        assertEq(config.ibTokenAddress, address(ibToken));
+        assertEq(config.debtTokenAddress, address(debtToken));
+        assertEq(config.interestRateModelAddress, address(irm));
+        assertEq(config.reserveFactor, reserveFactor);
+        assertTrue(config.isPToken);
     }
 
-    function testCannotSetMarketPTokenForNotOwner() public {
-        PToken pToken = createPToken(admin, address(market));
-
+    function testCannotConfigureMarketAsPTokenForNotOwner() public {
         vm.prank(user);
         vm.expectRevert("!authorized");
-        configurator.setMarketPToken(address(market), address(pToken));
+        configurator.configureMarketAsPToken(address(market));
     }
 
-    function testCannotSetMarketPTokenForMismatchPToken() public {
-        ERC20 market2 = new ERC20("Token", "TOKEN");
-        PToken pToken = createPToken(admin, address(market2));
-
+    function testCannotConfigureMarketAsPTokenForNotAPToken() public {
         vm.prank(admin);
-        vm.expectRevert("mismatch pToken");
-        configurator.setMarketPToken(address(market), address(pToken));
+        vm.expectRevert();
+        configurator.configureMarketAsPToken(address(market));
     }
 
-    function testCannotSetMarketPTokenForPTokenNotListed() public {
+    function testCannotConfigureMarketAsPTokenForNotListed() public {
         PToken pToken = createPToken(admin, address(market));
 
         vm.prank(admin);
-        vm.expectRevert("pToken not listed");
-        configurator.setMarketPToken(address(market), address(pToken));
-    }
-
-    function testCannotSetMarketPTokenForNotListed() public {
-        uint16 reserveFactor = 1000; // 10%
-
-        PToken pToken = createPToken(admin, address(notListedMarket));
-        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
-        DebtToken debtToken2 = createDebtToken(admin, address(ib), address(pToken));
-
-        vm.startPrank(admin);
-        configurator.listMarket(address(pToken), address(ibToken2), address(debtToken2), address(irm), reserveFactor);
-
         vm.expectRevert("not listed");
-        configurator.setMarketPToken(address(notListedMarket), address(pToken));
-        vm.stopPrank();
+        configurator.configureMarketAsPToken(address(pToken));
     }
 
-    function testCannotSetMarketPTokenForPTokenAlreadySet() public {
+    function testCannotConfigureMarketAsPTokenForAlreadyAPToken() public {
         uint16 reserveFactor = 1000; // 10%
 
-        ERC20 market2 = new ERC20("Token", "TOKEN");
-        IBToken ibToken1 = createIBToken(admin, address(ib), address(market2));
-        DebtToken debtToken1 = createDebtToken(admin, address(ib), address(market2));
+        PToken pToken = createPToken(admin, address(market));
+        IBToken ibToken = createIBToken(admin, address(ib), address(pToken));
 
-        PToken pToken = createPToken(admin, address(market2));
-        IBToken ibToken2 = createIBToken(admin, address(ib), address(pToken));
+        vm.prank(admin);
+        configurator.listPTokenMarket(address(pToken), address(ibToken), address(irm), reserveFactor);
 
-        // List the pToken first.
-        vm.startPrank(admin);
-        configurator.listPTokenMarket(address(pToken), address(ibToken2), address(irm), reserveFactor);
-
-        // List the underlying of the pToken.
-        configurator.listMarket(address(market2), address(ibToken1), address(debtToken1), address(irm), reserveFactor);
-
-        // Set the pToken.
-        configurator.setMarketPToken(address(market2), address(pToken));
-
-        vm.expectRevert("pToken already set");
-        configurator.setMarketPToken(address(market2), address(pToken));
-        vm.stopPrank();
+        vm.prank(admin);
+        vm.expectRevert("already a pToken");
+        configurator.configureMarketAsPToken(address(pToken));
     }
 }

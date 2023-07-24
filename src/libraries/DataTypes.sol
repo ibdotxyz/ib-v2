@@ -21,7 +21,6 @@ library DataTypes {
         // 20 + 20 + 20 + 32 + 32 + 32
         address ibTokenAddress;
         address debtTokenAddress;
-        address pTokenAddress;
         address interestRateModelAddress;
         uint256 supplyCap;
         uint256 borrowCap;
