@@ -558,6 +558,10 @@ contract LiquidateTest is Test, Common {
         vm.prank(user2);
         vm.expectRevert("cannot liquidate credit account");
         ib.liquidate(user2, user1, address(market2), address(market1), repayAmount);
+
+        vm.prank(user1);
+        vm.expectRevert("cannot liquidate credit account");
+        ib.liquidate(user1, user2, address(market2), address(market1), repayAmount);
     }
 
     function testCannotLiquidateForCannotSelfLiquidate() public {

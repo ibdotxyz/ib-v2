@@ -79,7 +79,6 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
         setPriceForMarket(oracle, admin, WETH, Denominations.ETH, Denominations.USD);
         setPriceForMarket(oracle, admin, DAI, DAI, Denominations.USD);
         setPriceForMarket(oracle, admin, USDT, USDT, Denominations.USD);
-        setPriceForMarket(oracle, admin, address(pDAI), DAI, Denominations.USD);
 
         // Set collateral factors.
         configureMarketAsCollateral(admin, configurator, WETH, wethCollateralFactor);
@@ -127,7 +126,7 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
-        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
         extension.execute{value: supplyAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -159,7 +158,7 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
-        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
         extension.execute{value: supplyAmount}(actions);
 
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
@@ -183,7 +182,7 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
-        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
         extension.execute{value: supplyAmount}(actions);
 
         uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
@@ -219,7 +218,7 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         actions = new TxBuilderExtension.Action[](1);
-        actions[0] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: abi.encode(repayAmount)});
         extension.execute{value: repayAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
@@ -245,13 +244,30 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
 
         vm.prank(user1);
         actions = new TxBuilderExtension.Action[](1);
-        actions[0] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: bytes("")});
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: abi.encode(type(uint256).max)});
         extension.execute{value: repayAmount}(actions);
 
         uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
         uint256 user1EthAfter = user1.balance;
         assertEq(poolWethAfter - poolWethBefore, 10e18);
         assertEq(user1EthBefore - user1EthAfter, 10e18);
+    }
+
+    function testRefundUnusedEther() public {
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+        uint256 nativeTokenAmount = 15e18;
+        uint256 supplyAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        extension.execute{value: nativeTokenAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, supplyAmount);
+        assertEq(user1EthBefore - user1EthAfter, supplyAmount);
     }
 
     function testSupplyBorrowRedeemRepay() public {
@@ -512,6 +528,98 @@ contract TxBuilderExtensionIntegrationTest is Test, Common {
         TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
         actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
         extension.execute(actions);
+    }
+
+    function testDeferLiquidityCheckWithSupplyEther() public {
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+        uint256 supplyAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](2);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        extension.execute{value: supplyAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, supplyAmount);
+        assertEq(user1EthBefore - user1EthAfter, supplyAmount);
+    }
+
+    function testDeferLiquidityCheckWithSupplyEther2() public {
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+        uint256 nativeTokenAmount = 25e18;
+        uint256 supplyAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](3);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        actions[2] = TxBuilderExtension.Action({name: "ACTION_SUPPLY_NATIVE_TOKEN", data: abi.encode(supplyAmount)});
+        extension.execute{value: nativeTokenAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, 20e18); // supply twice
+        assertEq(user1EthBefore - user1EthAfter, 20e18); // 5 eth will be refunded
+    }
+
+    function testDeferLiquidityCheckWithRepayEther() public {
+        prepareBorrow();
+
+        uint256 borrowAmount = 10e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        extension.execute(actions);
+
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+
+        uint256 repayAmount = 5e18;
+
+        vm.prank(user1);
+        actions = new TxBuilderExtension.Action[](2);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: abi.encode(repayAmount)});
+        extension.execute{value: repayAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, repayAmount);
+        assertEq(user1EthBefore - user1EthAfter, repayAmount);
+    }
+
+    function testDeferLiquidityCheckWithRepayEther2() public {
+        prepareBorrow();
+
+        uint256 borrowAmount = 12e18;
+
+        vm.prank(user1);
+        TxBuilderExtension.Action[] memory actions = new TxBuilderExtension.Action[](1);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_BORROW_NATIVE_TOKEN", data: abi.encode(borrowAmount)});
+        extension.execute(actions);
+
+        uint256 poolWethBefore = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthBefore = user1.balance;
+
+        uint256 nativeTokenAmount = 15e18;
+        uint256 repayAmount = 5e18;
+
+        vm.prank(user1);
+        actions = new TxBuilderExtension.Action[](3);
+        actions[0] = TxBuilderExtension.Action({name: "ACTION_DEFER_LIQUIDITY_CHECK", data: bytes("")});
+        actions[1] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: abi.encode(repayAmount)});
+        actions[2] = TxBuilderExtension.Action({name: "ACTION_REPAY_NATIVE_TOKEN", data: abi.encode(type(uint256).max)}); // repay 7 eth
+        extension.execute{value: nativeTokenAmount}(actions);
+
+        uint256 poolWethAfter = IERC20(WETH).balanceOf(address(ib));
+        uint256 user1EthAfter = user1.balance;
+        assertEq(poolWethAfter - poolWethBefore, borrowAmount);
+        assertEq(user1EthBefore - user1EthAfter, borrowAmount);
     }
 
     function testDeferLiquidityCheckWithPToken() public {

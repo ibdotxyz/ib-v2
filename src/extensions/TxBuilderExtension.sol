@@ -60,6 +60,9 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
     /// @notice The action for redeeming pToken
     bytes32 public constant ACTION_REDEEM_PTOKEN = "ACTION_REDEEM_PTOKEN";
 
+    /// @dev Transient storage variable used for native token amount
+    uint256 private unusedNativeToken;
+
     /// @notice The address of IronBank
     IronBankInterface public immutable ironBank;
 
@@ -98,6 +101,8 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
      * @param actions The list of actions
      */
     function execute(Action[] calldata actions) external payable {
+        unusedNativeToken = msg.value;
+
         executeInternal(msg.sender, actions, 0);
     }
 
@@ -139,7 +144,8 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
      * @param index The index of the action to start with
      */
     function executeInternal(address user, Action[] memory actions, uint256 index) internal {
-        for (uint256 i = index; i < actions.length;) {
+        uint256 i = index;
+        while (i < actions.length) {
             Action memory action = actions[i];
             if (action.name == ACTION_DEFER_LIQUIDITY_CHECK) {
                 deferLiquidityCheck(user, abi.encode(user, actions, i + 1));
@@ -159,7 +165,9 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
                 repay(user, asset, amount);
             } else if (action.name == ACTION_SUPPLY_NATIVE_TOKEN) {
-                supplyNativeToken(user);
+                uint256 supplyAmount = abi.decode(action.data, (uint256));
+                supplyNativeToken(user, supplyAmount);
+                unusedNativeToken -= supplyAmount;
             } else if (action.name == ACTION_BORROW_NATIVE_TOKEN) {
                 uint256 borrowAmount = abi.decode(action.data, (uint256));
                 borrowNativeToken(user, borrowAmount);
@@ -167,7 +175,9 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
                 uint256 redeemAmount = abi.decode(action.data, (uint256));
                 redeemNativeToken(user, redeemAmount);
             } else if (action.name == ACTION_REPAY_NATIVE_TOKEN) {
-                repayNativeToken(user);
+                uint256 repayAmount = abi.decode(action.data, (uint256));
+                repayAmount = repayNativeToken(user, repayAmount);
+                unusedNativeToken -= repayAmount;
             } else if (action.name == ACTION_SUPPLY_STETH) {
                 uint256 amount = abi.decode(action.data, (uint256));
                 supplyStEth(user, amount);
@@ -193,6 +203,13 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
             unchecked {
                 i++;
             }
+        }
+
+        // Refund unused native token back to user if the action list is fully executed.
+        if (i == actions.length && unusedNativeToken > 0) {
+            (bool sent,) = user.call{value: unusedNativeToken}("");
+            require(sent, "failed to send native token");
+            unusedNativeToken = 0;
         }
     }
 
@@ -248,11 +265,12 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
     /**
      * @dev Wraps the native token and supplies it to Iron Bank.
      * @param user The address of the user
+     * @param supplyAmount The amount of the wrapped native token to supply
      */
-    function supplyNativeToken(address user) internal nonReentrant {
-        WethInterface(weth).deposit{value: msg.value}();
-        IERC20(weth).safeIncreaseAllowance(address(ironBank), msg.value);
-        ironBank.supply(address(this), user, weth, msg.value);
+    function supplyNativeToken(address user, uint256 supplyAmount) internal nonReentrant {
+        WethInterface(weth).deposit{value: supplyAmount}();
+        IERC20(weth).safeIncreaseAllowance(address(ironBank), supplyAmount);
+        ironBank.supply(address(this), user, weth, supplyAmount);
     }
 
     /**
@@ -274,6 +292,7 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
      */
     function redeemNativeToken(address user, uint256 redeemAmount) internal nonReentrant {
         if (redeemAmount == type(uint256).max) {
+            ironBank.accrueInterest(weth);
             redeemAmount = ironBank.getSupplyBalance(user, weth);
         }
         ironBank.redeem(user, address(this), weth, redeemAmount);
@@ -284,25 +303,18 @@ contract TxBuilderExtension is ReentrancyGuard, Ownable2Step, DeferLiquidityChec
 
     /**
      * @dev Wraps the native token and repays it to Iron Bank.
-     * @dev If the amount of the native token is greater than the borrow balance, the excess amount will be sent back to the user.
      * @param user The address of the user
+     * @param repayAmount The amount of the wrapped native token to repay, -1 means repay all
      */
-    function repayNativeToken(address user) internal nonReentrant {
-        uint256 repayAmount = msg.value;
-
-        ironBank.accrueInterest(weth);
-        uint256 borrowBalance = ironBank.getBorrowBalance(user, weth);
-        if (repayAmount > borrowBalance) {
-            WethInterface(weth).deposit{value: borrowBalance}();
-            IERC20(weth).safeIncreaseAllowance(address(ironBank), borrowBalance);
-            ironBank.repay(address(this), user, weth, borrowBalance);
-            (bool sent,) = user.call{value: repayAmount - borrowBalance}("");
-            require(sent, "failed to send native token");
-        } else {
-            WethInterface(weth).deposit{value: repayAmount}();
-            IERC20(weth).safeIncreaseAllowance(address(ironBank), repayAmount);
-            ironBank.repay(address(this), user, weth, repayAmount);
+    function repayNativeToken(address user, uint256 repayAmount) internal nonReentrant returns (uint256) {
+        if (repayAmount == type(uint256).max) {
+            ironBank.accrueInterest(weth);
+            repayAmount = ironBank.getBorrowBalance(user, weth);
         }
+        WethInterface(weth).deposit{value: repayAmount}();
+        IERC20(weth).safeIncreaseAllowance(address(ironBank), repayAmount);
+        ironBank.repay(address(this), user, weth, repayAmount);
+        return repayAmount;
     }
 
     /**

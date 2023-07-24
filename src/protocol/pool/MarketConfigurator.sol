@@ -188,7 +188,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
         require(config.isListed, "not listed");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 
-        // Accrue interests before changing IRM.
+        // Accrue interests before changing reserve factor.
         ironBank.accrueInterest(market);
 
         config.reserveFactor = reserveFactor;
@@ -292,6 +292,9 @@ contract MarketConfigurator is Ownable2Step, Constants {
             emit MarketPausedSet(market, "borrow", true);
         }
         if (config.reserveFactor != MAX_RESERVE_FACTOR) {
+            // Accrue interests before changing reserve factor.
+            ironBank.accrueInterest(market);
+
             config.reserveFactor = MAX_RESERVE_FACTOR;
             emit MarketReserveFactorSet(market, MAX_RESERVE_FACTOR);
         }
@@ -457,7 +460,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     }
 
     /**
-     * @dev List a vanila market or a pToken market.
+     * @dev List a vanilla market or a pToken market. Markets that were delisted can't be listed again.
      * @param market The market to be listed
      * @param ibTokenAddress The ibToken of the market
      * @param debtTokenAddress The debtToken of the market
@@ -475,6 +478,7 @@ contract MarketConfigurator is Ownable2Step, Constants {
     ) internal {
         DataTypes.MarketConfig memory config = getMarketConfiguration(market);
         require(!config.isListed, "already listed");
+        require(!config.isDelisted, "already delisted");
         require(IBTokenInterface(ibTokenAddress).asset() == market, "mismatch market");
         require(reserveFactor <= MAX_RESERVE_FACTOR, "invalid reserve factor");
 

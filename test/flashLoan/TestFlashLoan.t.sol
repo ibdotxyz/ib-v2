@@ -223,6 +223,15 @@ contract FlashLoanTest is Test, Common, FlashLoanTestEvents {
         uint256 maxAmount = flashLoan.maxFlashLoan(address(market1));
         assertEq(maxAmount, 10000e18);
 
+        vm.prank(admin);
+        configurator.setMarketBorrowPaused(address(market1), true);
+
+        maxAmount = flashLoan.maxFlashLoan(address(market1));
+        assertEq(maxAmount, 0); // won't revert
+
+        vm.prank(admin);
+        configurator.setMarketBorrowPaused(address(market1), false);
+
         // Make some borrow.
         vm.prank(admin);
         creditLimitManager.setCreditLimit(user1, address(market1), 10000e18);
@@ -267,6 +276,12 @@ contract FlashLoanTest is Test, Common, FlashLoanTestEvents {
         ERC20 notListedMarket = new ERC20("Token", "TOKEN");
         vm.expectRevert("token not listed");
         flashLoan.flashFee(address(notListedMarket), borrowAmount);
+
+        vm.prank(admin);
+        configurator.setMarketBorrowPaused(address(market1), true);
+
+        vm.expectRevert("borrow is paused");
+        flashLoan.flashFee(address(market1), borrowAmount);
     }
 
     function testFlashLoan() public {

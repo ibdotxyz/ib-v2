@@ -9,7 +9,7 @@ library DataTypes {
     }
 
     struct MarketConfig {
-        // 1 + 1 + 2 + 2 + 2 + 2 + 1 = 11
+        // 1 + 1 + 2 + 2 + 2 + 2 + 1 + 1 = 12
         bool isListed;
         uint8 pauseFlags;
         uint16 collateralFactor;
@@ -17,6 +17,7 @@ library DataTypes {
         uint16 liquidationBonus;
         uint16 reserveFactor;
         bool isPToken;
+        bool isDelisted;
         // 20 + 20 + 20 + 32 + 32 + 32
         address ibTokenAddress;
         address debtTokenAddress;

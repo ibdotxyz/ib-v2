@@ -88,6 +88,9 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
     /// @dev Transient storage variable used for returning the computed amount in for an exact input Uniswap v2 swap.
     uint256 private uniV2AmountOutCached = DEFAULT_AMOUNT_CACHED;
 
+    /// @dev Transient storage variable used for native token amount
+    uint256 private unusedNativeToken;
+
     /// @notice The address of IronBank
     IronBankInterface public immutable ironBank;
 
@@ -152,13 +155,17 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
      * @param actions The list of actions
      */
     function execute(Action[] calldata actions) external payable {
+        unusedNativeToken = msg.value;
+
         for (uint256 i = 0; i < actions.length;) {
             Action memory action = actions[i];
             if (action.name == ACTION_SUPPLY) {
                 (address asset, uint256 amount) = abi.decode(action.data, (address, uint256));
                 supply(asset, amount);
             } else if (action.name == ACTION_SUPPLY_NATIVE_TOKEN) {
-                supplyNativeToken();
+                uint256 supplyAmount = abi.decode(action.data, (uint256));
+                supplyNativeToken(supplyAmount);
+                unusedNativeToken -= supplyAmount;
             } else if (action.name == ACTION_SUPPLY_STETH) {
                 uint256 amount = abi.decode(action.data, (uint256));
                 supplyStEth(amount);
@@ -222,6 +229,13 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
             unchecked {
                 i++;
             }
+        }
+
+        // Refund unused native token back to user.
+        if (unusedNativeToken > 0) {
+            (bool sent,) = msg.sender.call{value: unusedNativeToken}("");
+            require(sent, "failed to send native token");
+            unusedNativeToken = 0;
         }
     }
 
@@ -456,11 +470,12 @@ contract UniswapExtension is ReentrancyGuard, Ownable2Step, IUniswapV3SwapCallba
 
     /**
      * @notice Wraps the native token and supplies it to Iron Bank.
+     * @param amount The amount of the native token to supply
      */
-    function supplyNativeToken() internal nonReentrant {
-        WethInterface(weth).deposit{value: msg.value}();
-        IERC20(weth).safeIncreaseAllowance(address(ironBank), msg.value);
-        ironBank.supply(address(this), msg.sender, weth, msg.value);
+    function supplyNativeToken(uint256 amount) internal nonReentrant {
+        WethInterface(weth).deposit{value: amount}();
+        IERC20(weth).safeIncreaseAllowance(address(ironBank), amount);
+        ironBank.supply(address(this), msg.sender, weth, amount);
     }
 
     /**

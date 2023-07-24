@@ -5,7 +5,7 @@ pragma solidity ^0.8.0;
 import "forge-std/Test.sol";
 import "./Common.t.sol";
 
-contract BorrowTest is Test, Common {
+contract IronBankLensTest is Test, Common {
     uint16 internal constant reserveFactor = 1000; // 10%
 
     int256 internal constant market1Price = 1500e8;
@@ -394,5 +394,27 @@ contract BorrowTest is Test, Common {
         assertEq(status[1].ibTokenBalance, 0);
         assertEq(status[1].supplyBalance, 0);
         assertEq(status[1].borrowBalance, 300.041472e18);
+    }
+
+    function testGetPTokenMarketStatus() public {
+        // List pToken.
+        PToken pToken1 = createPToken(admin, address(market1));
+        IBToken ibToken = createIBToken(admin, address(ib), address(pToken1));
+
+        vm.prank(admin);
+        configurator.listPTokenMarket(address(pToken1), address(ibToken), address(irm), reserveFactor);
+
+        IronBankLens.MarketStatus memory status = lens.getMarketStatus(ib, address(pToken1));
+        assertEq(status.market, address(pToken1));
+        assertEq(status.totalCash, 0);
+        assertEq(status.totalBorrow, 0);
+        assertEq(status.totalSupply, 0);
+        assertEq(status.totalReserves, 0);
+        assertEq(status.maxSupplyAmount, type(uint256).max);
+        assertEq(status.maxBorrowAmount, 0); // pToken can't be borrowed out
+        assertEq(status.marketPrice, 1500e18); // price is normalized, same with market1
+        assertEq(status.exchangeRate, 1e18);
+        assertEq(status.supplyRate, irm.getSupplyRate(0, 0));
+        assertEq(status.borrowRate, irm.getBorrowRate(0, 0));
     }
 }

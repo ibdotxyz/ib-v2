@@ -14,6 +14,7 @@ import "../../interfaces/IBTokenInterface.sol";
 import "../../interfaces/InterestRateModelInterface.sol";
 import "../../interfaces/IronBankInterface.sol";
 import "../../interfaces/PriceOracleInterface.sol";
+import "../../interfaces/PTokenInterface.sol";
 import "../../libraries/Arrays.sol";
 import "../../libraries/DataTypes.sol";
 import "../../libraries/PauseFlags.sol";
@@ -271,8 +272,9 @@ contract IronBank is
         returns (uint256)
     {
         DataTypes.Market storage mCollateral = markets[marketCollateral];
+        DataTypes.Market storage mBorrow = markets[marketCollateral];
 
-        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        return _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mBorrow, mCollateral, repayAmount);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
@@ -321,6 +323,7 @@ contract IronBank is
         }
 
         uint256 ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
+        require(ibTokenAmount > 0, "zero ibToken amount");
 
         // Update storage.
         m.totalCash += amount;
@@ -417,28 +420,32 @@ contract IronBank is
         uint256 totalCash = m.totalCash;
 
         uint256 ibTokenAmount;
-        bool isRedeemFull;
         if (amount == type(uint256).max) {
             ibTokenAmount = userSupply;
             amount = (ibTokenAmount * _getExchangeRate(m)) / 1e18;
-            isRedeemFull = true;
         } else {
             ibTokenAmount = (amount * 1e18) / _getExchangeRate(m);
         }
 
+        require(ibTokenAmount > 0, "zero ibToken amount");
         require(userSupply >= ibTokenAmount, "insufficient balance");
         require(totalCash >= amount, "insufficient cash");
 
-        // Update storage.
+        uint256 newUserSupply;
         unchecked {
-            m.userSupplies[from] = userSupply - ibTokenAmount;
+            newUserSupply = userSupply - ibTokenAmount;
+        }
+
+        // Update storage.
+        m.userSupplies[from] = newUserSupply;
+        unchecked {
             m.totalCash = totalCash - amount;
             // Underflow not possible: ibTokenAmount <= userSupply <= totalSupply.
             m.totalSupply -= ibTokenAmount;
         }
 
         // Check if need to exit the market.
-        if (isRedeemFull && _getBorrowBalance(m, from) == 0) {
+        if (newUserSupply == 0 && _getBorrowBalance(m, from) == 0) {
             _exitMarket(market, from);
         }
 
@@ -489,7 +496,7 @@ contract IronBank is
         require(mBorrow.config.isListed, "borrow market not listed");
         require(mCollateral.config.isListed, "collateral market not listed");
         require(isMarketSeizable(mCollateral), "collateral market cannot be seized");
-        require(!isCreditAccount(borrower), "cannot liquidate credit account");
+        require(!isCreditAccount(liquidator) && !isCreditAccount(borrower), "cannot liquidate credit account");
         require(liquidator != borrower, "cannot self liquidate");
 
         _accrueInterest(marketBorrow, mBorrow);
@@ -502,7 +509,8 @@ contract IronBank is
         repayAmount = _repay(mBorrow, liquidator, borrower, marketBorrow, repayAmount);
 
         // Seize the collateral.
-        uint256 ibTokenAmount = _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mCollateral, repayAmount);
+        uint256 ibTokenAmount =
+            _getLiquidationSeizeAmount(marketBorrow, marketCollateral, mBorrow, mCollateral, repayAmount);
         _transferIBToken(marketCollateral, mCollateral, borrower, liquidator, ibTokenAmount);
         IBTokenInterface(mCollateral.config.ibTokenAddress).seize(borrower, liquidator, ibTokenAmount); // Only emits Transfer event.
 
@@ -581,8 +589,6 @@ contract IronBank is
      */
     function listMarket(address market, DataTypes.MarketConfig calldata config) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
-        require(!m.config.isListed, "already listed");
-
         m.lastUpdateTimestamp = _getNow();
         m.borrowIndex = INITIAL_BORROW_INDEX;
         m.config = config;
@@ -598,9 +604,10 @@ contract IronBank is
      */
     function delistMarket(address market) external onlyMarketConfigurator {
         DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
-        delete markets[market];
+        // The nested mapping like userBorrows can't be deleted completely, so we just set `isListed` to false.
+        m.config.isListed = false;
+        // `isDelisted` is needed to distinguish delisted markets from markets that have never been listed before.
+        m.config.isDelisted = true;
         allMarkets.deleteElement(market);
 
         emit MarketDelisted(market);
@@ -617,8 +624,6 @@ contract IronBank is
         onlyMarketConfigurator
     {
         DataTypes.Market storage m = markets[market];
-        require(m.config.isListed, "not listed");
-
         m.config = config;
 
         emit MarketConfigurationChanged(market, config);
@@ -814,6 +819,7 @@ contract IronBank is
      * @dev Get the amount of ibToken that can be seized in a liquidation.
      * @param marketBorrow The address of the market being borrowed from
      * @param marketCollateral The address of the market being used as collateral
+     * @param mBorrow The storage of the borrow market
      * @param mCollateral The storage of the collateral market
      * @param repayAmount The amount of the borrowed asset being repaid
      * @return The amount of ibToken that can be seized
@@ -821,12 +827,12 @@ contract IronBank is
     function _getLiquidationSeizeAmount(
         address marketBorrow,
         address marketCollateral,
+        DataTypes.Market storage mBorrow,
         DataTypes.Market storage mCollateral,
         uint256 repayAmount
     ) internal view returns (uint256) {
-        uint256 borrowMarketPrice = PriceOracleInterface(priceOracle).getPrice(marketBorrow);
-        uint256 collateralMarketPrice = PriceOracleInterface(priceOracle).getPrice(marketCollateral);
-        require(borrowMarketPrice > 0 && collateralMarketPrice > 0, "invalid price");
+        uint256 borrowMarketPrice = getMarketPrice(mBorrow, marketBorrow);
+        uint256 collateralMarketPrice = getMarketPrice(mCollateral, marketCollateral);
 
         // collateral amount = repayAmount * liquidationBonus * borrowMarketPrice / collateralMarketPrice
         // IBToken amount = collateral amount / exchangeRate
@@ -1043,8 +1049,7 @@ contract IronBank is
             uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
-            uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
-            require(assetPrice > 0, "invalid price");
+            uint256 assetPrice = getMarketPrice(m, userEnteredMarkets[i]);
             uint256 collateralFactor = m.config.collateralFactor;
             if (supplyBalance > 0 && collateralFactor > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
@@ -1076,8 +1081,7 @@ contract IronBank is
             uint256 supplyBalance = m.userSupplies[user];
             uint256 borrowBalance = _getBorrowBalance(m, user);
 
-            uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(userEnteredMarkets[i]);
-            require(assetPrice > 0, "invalid price");
+            uint256 assetPrice = getMarketPrice(m, userEnteredMarkets[i]);
             uint256 liquidationThreshold = m.config.liquidationThreshold;
             if (supplyBalance > 0 && liquidationThreshold > 0) {
                 uint256 exchangeRate = _getExchangeRate(m);
@@ -1098,5 +1102,18 @@ contract IronBank is
      */
     function isMarketSeizable(DataTypes.Market storage m) internal view returns (bool) {
         return !m.config.isTransferPaused() && m.config.liquidationThreshold > 0;
+    }
+
+    /**
+     * @dev Get the market price from the price oracle. If the market is a pToken, use its underlying to get the price.
+     * @param m The market object
+     * @param market The address of the market
+     * @return The market price
+     */
+    function getMarketPrice(DataTypes.Market storage m, address market) internal view returns (uint256) {
+        address asset = m.config.isPToken ? PTokenInterface(market).getUnderlying() : market;
+        uint256 assetPrice = PriceOracleInterface(priceOracle).getPrice(asset);
+        require(assetPrice > 0, "invalid price");
+        return assetPrice;
     }
 }
