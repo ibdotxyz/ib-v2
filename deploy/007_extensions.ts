@@ -23,7 +23,7 @@ const deployFn: DeployFunction = async (hre) => {
     });
     await execute("UniswapExtension", { from: deployer, log: true }, "transferOwnership", admin);
   } else {
-    await deploy("Multicall2", {
+    await deploy("Multicall3", {
       from: deployer,
       args: [],
       log: true,

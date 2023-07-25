@@ -62,7 +62,7 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
   ]);
 
   await network.provider.send("evm_setAutomine", [false]);
-  await network.provider.send("evm_setIntervalMining", [3000]);
+  await network.provider.send("evm_setIntervalMining", [5000]);
 };
 
 deployFn.dependencies = ["ListMarkets"];

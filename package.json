@@ -5,6 +5,9 @@
   "repository": "git@github.com:ibdotxyz/ib-v2.git",
   "author": "Tycho <tycho@ib.xyz>",
   "license": "MIT",
+  "scripts": {
+    "node": "hardhat node"
+  },
   "devDependencies": {
     "@nomicfoundation/hardhat-foundry": "^1.0.1",
     "@nomiclabs/hardhat-ethers": "npm:hardhat-deploy-ethers",
