@@ -7,7 +7,7 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
   const { defaultAbiCoder, formatBytes32String, parseEther, parseUnits } = ethers.utils;
 
   const network = hre.network as any;
-  if (network.config.forking || network.name == "mainnet") {
+  if (network.config.forking || network.name !== "hardhat") {
     return;
   }
 
@@ -54,7 +54,7 @@ const deployFn: DeployFunction = async function (hre: HardhatRuntimeEnvironment)
 
   await execute("IronBank", { from: user1, log: true }, "setUserExtension", txBuilderExtAddress, true);
   await execute("TxBuilderExtension", { from: user1, log: true, value: parseEther("10") }, "execute", [
-    [formatBytes32String("ACTION_SUPPLY_NATIVE_TOKEN"), "0x"],
+    [formatBytes32String("ACTION_SUPPLY_NATIVE_TOKEN"), defaultAbiCoder.encode(["uint256"], [parseEther("10")])],
     [
       formatBytes32String("ACTION_BORROW"),
       defaultAbiCoder.encode(["address", "uint256"], [usdcAddress, parseUnits("8551", 6)]),

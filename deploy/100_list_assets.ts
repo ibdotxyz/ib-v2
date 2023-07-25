@@ -155,7 +155,7 @@ const deployFn: DeployFunction = async (hre: HardhatRuntimeEnvironment) => {
   }
 
   for (const [underlying, pToken] of marketPTokens) {
-    await execute("MarketConfigurator", { from: deployer, log: true }, "setMarketPToken", underlying, pToken);
+    await execute("MarketConfigurator", { from: deployer, log: true }, "configureMarketAsPToken", pToken);
   }
 };
 
