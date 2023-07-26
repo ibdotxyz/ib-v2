@@ -27,6 +27,8 @@ interface IronBankInterface {
 
     function isMarketListed(address market) external view returns (bool);
 
+    function getExchangeRate(address market) external view returns (uint256);
+
     function getTotalSupply(address market) external view returns (uint256);
 
     function getTotalBorrow(address market) external view returns (uint256);

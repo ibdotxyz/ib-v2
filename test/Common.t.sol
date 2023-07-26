@@ -4,6 +4,7 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "openzeppelin-contracts/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import "../src/extensions/MigrationExtension.sol";
 import "../src/extensions/TxBuilderExtension.sol";
 import "../src/extensions/UniswapExtension.sol";
 import "../src/flashLoan/interfaces/IERC3156FlashBorrower.sol";
@@ -270,5 +271,17 @@ abstract contract Common is Test, Events {
 
     function createFlashLoan(IronBank _ironBank) internal returns (FlashLoan) {
         return new FlashLoan(address(_ironBank));
+    }
+
+    function createMigrationExtension(address _admin, IronBank _ironBank, address _v1Comptroller, address _weth)
+        internal
+        returns (MigrationExtension)
+    {
+        MigrationExtension ext = new MigrationExtension(address(_ironBank), _v1Comptroller, _weth);
+        ext.transferOwnership(_admin);
+        vm.startPrank(_admin);
+        ext.acceptOwnership();
+        vm.stopPrank();
+        return ext;
     }
 }
